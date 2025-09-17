@@ -41,7 +41,3 @@ integrations = ["javascript_websocket==1.0.0"]
 localPort = 5000
 externalPort = 80
 exposeLocalhost = true
-
-[[ports]]
-localPort = 45613
-externalPort = 3000

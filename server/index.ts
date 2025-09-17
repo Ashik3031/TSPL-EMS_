@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -37,9 +38,33 @@ app.use((req, res, next) => {
   next();
 });
 
+// Daily submission reset scheduler
+function scheduleDailyReset() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+  setTimeout(async () => {
+    log('🔄 Performing daily submission reset...');
+    await storage.resetDailySubmissions();
+    log('✅ Daily submission reset completed');
+    
+    // Schedule the next reset
+    scheduleDailyReset();
+  }, msUntilMidnight);
+}
+
 (async () => {
   // Seed data on startup
   await seedData();
+  
+  // Perform initial daily reset check
+  log("🔄 Checking for daily submission reset...");
+  await storage.resetDailySubmissions();
+  log("✅ Daily submission reset check completed");
+
+  // Schedule daily resets
+  scheduleDailyReset();
   
   const server = await registerRoutes(app);
 

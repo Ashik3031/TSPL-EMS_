@@ -21,6 +21,7 @@ export interface IStorage {
   createAgent(agent: InsertAgent): Promise<Agent>;
   updateAgent(id: string, updates: Partial<Agent>): Promise<Agent | undefined>;
   deleteAgent(id: string): Promise<boolean>;
+  resetDailySubmissions(): Promise<void>;
   
   // Notification methods
   getActiveNotification(): Promise<Notification | undefined>;
@@ -114,6 +115,25 @@ export class MemStorage implements IStorage {
 
   async deleteAgent(id: string): Promise<boolean> {
     return this.agents.delete(id);
+  }
+
+  async resetDailySubmissions(): Promise<void> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    Array.from(this.agents.entries()).forEach(([id, agent]) => {
+      const lastReset = new Date(agent.lastSubmissionReset);
+      const lastResetDay = new Date(lastReset.getFullYear(), lastReset.getMonth(), lastReset.getDate());
+      
+      // If last reset was before today, reset submissions
+      if (lastResetDay < today) {
+        this.agents.set(id, {
+          ...agent,
+          submissions: 0,
+          lastSubmissionReset: now
+        });
+      }
+    });
   }
 
   async getActiveNotification(): Promise<Notification | undefined> {

@@ -69,7 +69,8 @@ export async function seedData() {
       activationTarget: 25,
       activations: 23,
       submissions: 89,
-      points: 1234
+      points: 1234,
+      lastSubmissionReset: new Date()
     },
     {
       name: 'Lisa Wong',
@@ -78,7 +79,8 @@ export async function seedData() {
       activationTarget: 25,
       activations: 19,
       submissions: 67,
-      points: 987
+      points: 987,
+      lastSubmissionReset: new Date()
     },
     {
       name: 'David Park',
@@ -87,7 +89,8 @@ export async function seedData() {
       activationTarget: 20,
       activations: 12,
       submissions: 54,
-      points: 678
+      points: 678,
+      lastSubmissionReset: new Date()
     }
   ];
 
@@ -99,7 +102,8 @@ export async function seedData() {
       activationTarget: 25,
       activations: 21,
       submissions: 78,
-      points: 1156
+      points: 1156,
+      lastSubmissionReset: new Date()
     },
     {
       name: 'Emma Thompson',
@@ -108,7 +112,8 @@ export async function seedData() {
       activationTarget: 24,
       activations: 16,
       submissions: 61,
-      points: 892
+      points: 892,
+      lastSubmissionReset: new Date()
     },
     {
       name: 'Ryan Lee',
@@ -117,7 +122,8 @@ export async function seedData() {
       activationTarget: 20,
       activations: 9,
       submissions: 43,
-      points: 567
+      points: 567,
+      lastSubmissionReset: new Date()
     }
   ];
 

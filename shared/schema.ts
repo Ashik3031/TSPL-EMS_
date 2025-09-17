@@ -58,6 +58,7 @@ export const agents = {
   activations: z.number(),
   submissions: z.number(),
   points: z.number(),
+  lastSubmissionReset: z.date(),
 };
 
 export const insertAgentSchema = z.object({
@@ -68,6 +69,7 @@ export const insertAgentSchema = z.object({
   activations: z.number().default(0),
   submissions: z.number().default(0),
   points: z.number().default(0),
+  lastSubmissionReset: z.date().default(() => new Date()),
 });
 
 export type InsertAgent = z.infer<typeof insertAgentSchema>;
