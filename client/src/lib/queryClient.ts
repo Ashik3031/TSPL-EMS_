@@ -8,9 +8,13 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function getAuthHeaders() {
+function getAuthHeaders(): Record<string, string> {
   const token = useAuthStore.getState().token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 export async function apiRequest(
@@ -18,10 +22,13 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const headers = {
-    ...(data ? { "Content-Type": "application/json" } : {}),
+  const headers: Record<string, string> = {
     ...getAuthHeaders(),
   };
+  
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
 
   const res = await fetch(url, {
     method,
