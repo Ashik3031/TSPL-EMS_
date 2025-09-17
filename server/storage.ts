@@ -20,6 +20,7 @@ export interface IStorage {
   getAllAgents(): Promise<Agent[]>;
   createAgent(agent: InsertAgent): Promise<Agent>;
   updateAgent(id: string, updates: Partial<Agent>): Promise<Agent | undefined>;
+  deleteAgent(id: string): Promise<boolean>;
   
   // Notification methods
   getActiveNotification(): Promise<Notification | undefined>;
@@ -111,6 +112,10 @@ export class MemStorage implements IStorage {
     return updatedAgent;
   }
 
+  async deleteAgent(id: string): Promise<boolean> {
+    return this.agents.delete(id);
+  }
+
   async getActiveNotification(): Promise<Notification | undefined> {
     return Array.from(this.notifications.values()).find(notification => notification.isActive);
   }
@@ -130,11 +135,11 @@ export class MemStorage implements IStorage {
   }
 
   async clearActiveNotifications(): Promise<void> {
-    for (const [id, notification] of this.notifications) {
+    Array.from(this.notifications.entries()).forEach(([id, notification]) => {
       if (notification.isActive) {
         this.notifications.set(id, { ...notification, isActive: false });
       }
-    }
+    });
   }
 }
 

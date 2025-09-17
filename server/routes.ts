@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { authenticate, requireRole, requireTLOrAdmin } from "./middleware/auth";
 import { computeLeaderboard } from "./utils/computeLeaderboard";
 import { computeTopStats } from "./utils/topStats";
-import { loginSchema, tlUpdateSchema, insertNotificationSchema } from "@shared/schema";
+import { loginSchema, tlUpdateSchema, insertNotificationSchema, insertAgentSchema } from "@shared/schema";
 
 // Rate limiting
 const tlUpdateLimiter = rateLimit({
@@ -350,6 +350,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // Agent management routes for TLs
+  app.post('/api/tl/agents', authenticate, requireTLOrAdmin, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      // Get the team for this TL
+      let team;
+      if (user.role === 'tl') {
+        team = await storage.getTeamByTlId(user.id);
+        if (!team) {
+          return res.status(404).json({ message: 'Team not found for this team leader' });
+        }
+      }
+
+      const agentData = insertAgentSchema.parse({
+        ...req.body,
+        teamId: user.role === 'tl' ? team!.id : req.body.teamId
+      });
+      
+      const newAgent = await storage.createAgent(agentData);
+      
+      // Recompute and broadcast leaderboard
+      const leaderboardData = await computeLeaderboard();
+      broadcastToAll({
+        type: 'leaderboard:update',
+        data: leaderboardData
+      });
+      
+      res.status(201).json(newAgent);
+    } catch (error) {
+      console.error('Create agent error:', error);
+      res.status(400).json({ message: 'Invalid agent data' });
+    }
+  });
+
+  app.delete('/api/tl/agents/:id', authenticate, requireTLOrAdmin, async (req, res) => {
+    try {
+      const agentId = req.params.id;
+      const user = req.user!;
+      
+      const agent = await storage.getAgent(agentId);
+      if (!agent) {
+        return res.status(404).json({ message: 'Agent not found' });
+      }
+      
+      // For TL role, ensure they can only delete their team's agents
+      if (user.role === 'tl') {
+        const team = await storage.getTeamByTlId(user.id);
+        if (!team || agent.teamId !== team.id) {
+          return res.status(403).json({ message: 'Cannot delete agents from other teams' });
+        }
+      }
+      
+      const deleted = await storage.deleteAgent(agentId);
+      if (!deleted) {
+        return res.status(404).json({ message: 'Agent not found' });
+      }
+      
+      // Recompute and broadcast leaderboard
+      const leaderboardData = await computeLeaderboard();
+      broadcastToAll({
+        type: 'leaderboard:update',
+        data: leaderboardData
+      });
+      
+      res.json({ message: 'Agent deleted successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete agent' });
+    }
+  });
 
   // Admin routes
   app.post('/api/admin/notifications', authenticate, requireRole('admin'), async (req, res) => {
