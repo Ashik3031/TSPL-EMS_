@@ -7,8 +7,7 @@ interface CelebrationData {
   agentId: string;
   agentName: string;
   photoUrl: string;
-  teamId: string;
-  teamName?: string; // keep optional like the premium UI version
+  teamId: string; // swap to teamName if available
   newActivationCount: number;
   timestamp: string;
 }
@@ -20,6 +19,8 @@ interface CelebrationPopupProps {
   bgMusicUrl?: string;
   musicVolume?: number;
   duckedVolume?: number;
+  flipDelayMs?: number;
+  autoCloseMs?: number;
 }
 
 export default function CelebrationPopup({
@@ -29,28 +30,24 @@ export default function CelebrationPopup({
   bgMusicUrl = 'https://res.cloudinary.com/dxq0nrirt/video/upload/v1758179396/ssvid.net--Rolex-Theme-Video-Vikram-Kamal-Haasan-ANIRUDH_128kbps.m4a_maxsqf.mp3',
   musicVolume = 0.25,
   duckedVolume = 0.08,
+  flipDelayMs = 2600,   // longer suspense window
+  autoCloseMs = 9500,   // slightly longer overall
 }: CelebrationPopupProps) {
   const { isSoundEnabled, toggleSound } = useAudioStore();
 
-  // UI state from premium version
-  const [confetti, setConfetti] = useState<
-    Array<{ id: number; left: number; delay: number; color: string; type: 'circle' | 'square' | 'triangle' | 'star' | 'heart' }>
-  >([]);
-  const [showCard, setShowCard] = useState(false);
-  const [flipCard, setFlipCard] = useState(false);
-  const [showFireworks, setShowFireworks] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [confetti, setConfetti] = useState<Array<{ id: number; left: number; delay: number; color: string }>>([]);
+  const [frontProgress, setFrontProgress] = useState(0); // ring progress 0-100
 
-  // Audio (from your old real-time code)
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const voiceRef = useRef<HTMLAudioElement | null>(null);
   const voiceUrlRef = useRef<string | null>(null);
-  const speakingRef = useRef(false);
 
-  const buildSentence = () => {
-    if (!data) return '';
-    const name = (data.agentName || '').trim() || 'ഏജന്റ്';
-    return `${name} ഒരു സെയിൽ ഇട്ടു, നന്ദി!`;
-  };
+  const teamLabel = data?.teamId ? `TEAM ${String(data.teamId).toUpperCase()}` : 'TEAM';
+  const agentDisplay = (data?.agentName || 'ഏജന്റ്').trim();
+
+  const buildSentence = () => `${agentDisplay} ഒരു സെയിൽ ഇട്ടു, നന്ദി!`;
 
   const startMusic = async () => {
     if (!bgMusicUrl) return;
@@ -64,11 +61,7 @@ export default function CelebrationPopup({
       musicRef.current.loop = true;
       musicRef.current.volume = musicVolume;
     }
-    try {
-      await musicRef.current.play();
-    } catch {
-      // autoplay might be blocked, ignore
-    }
+    try { await musicRef.current.play(); } catch {}
   };
 
   const stopMusic = () => {
@@ -81,416 +74,392 @@ export default function CelebrationPopup({
   };
 
   const playVoice = async () => {
-    const text = buildSentence();
-    if (!text) return;
     try {
-      const res = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
+      const res = await fetch(`/api/tts?text=${encodeURIComponent(buildSentence())}`);
       if (!res.ok) return;
-
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       voiceUrlRef.current = url;
 
       if (!voiceRef.current) voiceRef.current = new Audio();
-      const voice = voiceRef.current;
+      const v = voiceRef.current;
+      v.src = url;
+      v.preload = 'auto';
 
-      voice.src = url;
-      voice.preload = 'auto';
+      v.onplay = () => { if (musicRef.current) musicRef.current.volume = duckedVolume; };
+      const restore = () => { if (musicRef.current) musicRef.current.volume = musicVolume; };
+      v.onended = restore; v.onpause = restore; v.onerror = restore;
 
-      voice.onplay = () => {
-        speakingRef.current = true;
-        if (musicRef.current) musicRef.current.volume = duckedVolume;
-      };
-
-      const restore = () => {
-        speakingRef.current = false;
-        if (musicRef.current) musicRef.current.volume = musicVolume;
-      };
-      voice.onended = restore;
-      voice.onpause = restore;
-      voice.onerror = restore;
-
-      await voice.play();
-    } catch {
-      // ignore TTS errors silently
-    }
+      await v.play();
+    } catch {}
   };
 
   useEffect(() => {
     if (!isVisible || !data) return;
+    setMounted(true);
+    setIsFlipped(false);
+    setFrontProgress(0);
 
-    // Confetti (premium version w/ shapes)
-    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FF69B4', '#00CED1'];
-    const types: Array<'circle' | 'square' | 'triangle' | 'star' | 'heart'> = ['circle', 'square', 'triangle', 'star', 'heart'];
+    // background confetti prepared but mostly hidden until flip
+    const colors = ['#FFD700','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8'];
+    setConfetti(Array.from({ length: 110 }, (_, i) => ({
+      id: i, left: Math.random()*100, delay: Math.random()*2200, color: colors[Math.floor(Math.random()*colors.length)],
+    })));
 
-    setConfetti(
-      Array.from({ length: 150 }, (_, i) => ({
-        id: i,
-        left: Math.random() * 100,
-        delay: Math.random() * 3000,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        type: types[Math.floor(Math.random() * types.length)],
-      }))
-    );
+    // music now, if allowed
+    (async () => { if (isSoundEnabled) await startMusic(); })();
 
-    // Timed animations
-    const t1 = setTimeout(() => setShowCard(true), 300);
-    const t2 = setTimeout(() => setFlipCard(true), 2000);
-    const t3 = setTimeout(() => setShowFireworks(true), 2500);
-    const autoClose = setTimeout(onClose, 12000);
+    // progress ring animation for suspense
+    const started = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - started;
+      const pct = Math.min(100, (elapsed / flipDelayMs) * 100);
+      setFrontProgress(pct);
+      if (pct < 100 && mounted) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
 
-    // Audio (real-time logic)
-    (async () => {
-      if (!isSoundEnabled) return;
-      await startMusic();
-      setTimeout(() => playVoice(), 2500);
-    })();
+    // flip + voice timing
+    const flipTimer = setTimeout(async () => {
+      setIsFlipped(true);
+      // voice a beat after the flip for dramatic reveal
+      if (isSoundEnabled) setTimeout(() => playVoice(), 420);
+    }, flipDelayMs);
+
+    // auto close
+    const closeTimer = setTimeout(onClose, autoCloseMs);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(autoClose);
-      setShowCard(false);
-      setFlipCard(false);
-      setShowFireworks(false);
+      clearTimeout(flipTimer);
+      clearTimeout(closeTimer);
+      setMounted(false);
+      setIsFlipped(false);
 
-      if (voiceRef.current) {
-        try {
-          voiceRef.current.pause();
-        } catch {}
-        voiceRef.current.src = '';
-        voiceRef.current = null;
-      }
-      if (voiceUrlRef.current) {
-        URL.revokeObjectURL(voiceUrlRef.current);
-        voiceUrlRef.current = null;
-      }
+      if (voiceRef.current) { try { voiceRef.current.pause(); } catch {} voiceRef.current.src=''; voiceRef.current=null; }
+      if (voiceUrlRef.current) { URL.revokeObjectURL(voiceUrlRef.current); voiceUrlRef.current=null; }
       stopMusic();
     };
-  }, [isVisible, data, isSoundEnabled, onClose, duckedVolume, musicVolume]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, data, isSoundEnabled, onClose, autoCloseMs, flipDelayMs]);
+
+  const manualReveal = () => {
+    if (!isFlipped) {
+      setIsFlipped(true);
+      if (isSoundEnabled) setTimeout(() => playVoice(), 320);
+    }
+  };
 
   if (!isVisible || !data) return null;
 
-  const teamName = (data.teamName || 'SALES TEAM').toUpperCase();
-  const agentName = data.agentName || 'സെയിൽസ് ഏജന്റ്';
-  const agentPhoto =
-    data.photoUrl ||
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop&crop=face';
-
   return (
     <>
-      {/* Premium Styles (kept intact) */}
       <style jsx>{`
-        @keyframes cardDrop {
-          0% { transform: translateY(-120vh) rotateY(180deg) rotateX(45deg) scale(0.8); opacity: 0; }
-          70% { transform: translateY(30px) rotateY(0deg) rotateX(0deg) scale(1.05); opacity: 1; }
-          85% { transform: translateY(-15px) rotateY(0deg) rotateX(0deg) scale(0.98); }
-          100% { transform: translateY(0) rotateY(0deg) rotateX(0deg) scale(1); opacity: 1; }
+        /* Popup entrance */
+        @keyframes popIn {
+          0% { opacity: 0; transform: scale(0.96) translateY(6px); }
+          60% { opacity: 1; transform: scale(1.01) translateY(0); }
+          100% { opacity: 1; transform: scale(1); }
         }
-        @keyframes cardFlip {
-          0% { transform: rotateY(0deg) scale(1); }
-          50% { transform: rotateY(90deg) scale(1.05); }
-          100% { transform: rotateY(180deg) scale(1); }
+
+        /* Aurora background movement */
+        @keyframes auroraShift {
+          0% { transform: translateX(-10%) translateY(-6%) rotate(0deg); }
+          50% { transform: translateX(8%) translateY(6%) rotate(6deg); }
+          100% { transform: translateX(-10%) translateY(-6%) rotate(0deg); }
         }
-        @keyframes cardFloat {
-          0%, 100% { transform: translateY(0) rotateY(0deg) rotateZ(0deg); }
-          25% { transform: translateY(-8px) rotateY(2deg) rotateZ(-1deg); }
-          50% { transform: translateY(-12px) rotateY(0deg) rotateZ(0deg); }
-          75% { transform: translateY(-6px) rotateY(-2deg) rotateZ(1deg); }
+
+        /* Scene */
+        .scene {
+          perspective: 1600px;
+          animation: popIn 480ms ease forwards;
         }
-        @keyframes shimmer {
-          0% { background-position: -300px 0; opacity: 0; }
-          50% { opacity: 1; }
-          100% { background-position: 300px 0; opacity: 0; }
+
+        .card3d {
+          width: min(88vw, 440px);       /* narrower card */
+          height: min(82vh, 660px);
+          max-height: 660px;
+          transform-style: preserve-3d;
+          transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+          position: relative;
+          will-change: transform;
         }
-        @keyframes pulseGlow {
-          0%, 100% {
-            box-shadow:
-              0 0 40px rgba(255, 215, 0, 0.6),
-              0 0 80px rgba(255, 215, 0, 0.3),
-              inset 0 0 30px rgba(255, 215, 0, 0.15),
-              0 5px 20px rgba(0,0,0,0.3);
-          }
-          50% {
-            box-shadow:
-              0 0 70px rgba(255, 215, 0, 0.9),
-              0 0 120px rgba(255, 215, 0, 0.5),
-              inset 0 0 50px rgba(255, 215, 0, 0.25),
-              0 10px 30px rgba(0,0,0,0.4);
-          }
+        .card3d.flipped { transform: rotateY(180deg); }
+
+        .face {
+          position: absolute;
+          inset: 0;
+          backface-visibility: hidden;
+          border-radius: 22px;
+          overflow: hidden;
+          box-shadow: 0 28px 80px rgba(0,0,0,0.5);
+          border: 1px solid rgba(255,255,255,0.08);
         }
+
+        /* FRONT: darker, suspense */
+        .front {
+          background:
+            radial-gradient(120% 120% at 50% 10%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 48%),
+            linear-gradient(135deg, #060b17 0%, #0a1228 35%, #0f1c3f 100%);
+        }
+
+        /* BACK: luxe glass-metal */
+        .back {
+          transform: rotateY(180deg);
+          background:
+            radial-gradient(120% 140% at 50% -10%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 50%, transparent 70%),
+            linear-gradient(135deg, #0d1326 0%, #101833 40%, #0b1020 100%);
+        }
+
+        /* Float & heartbeat on front for tension */
+        .floaty { animation: floaty 3.2s ease-in-out infinite; }
+        @keyframes floaty { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+
+        .heartbeat { animation: heartbeat 1500ms ease-in-out infinite; }
+        @keyframes heartbeat {
+          0%, 100% { transform: scale(1); }
+          25% { transform: scale(1.01); }
+          40% { transform: scale(0.995); }
+          60% { transform: scale(1.012); }
+        }
+
+        /* Confetti (only impactful post-flip) */
         @keyframes confettiFall {
           0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+          100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
         }
-        @keyframes sparkle {
-          0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
-          50% { opacity: 1; transform: scale(1) rotate(180deg); }
+        .confetti-piece {
+          position: absolute; width: 10px; height: 10px;
+          animation: confettiFall 3.2s linear infinite;
+          border-radius: 2px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+          opacity: ${isFlipped ? 1 : 0}; transition: opacity 220ms ease;
         }
-        @keyframes teamPulse {
-          0%, 100% { transform: scale(1); opacity: 0.9; }
-          50% { transform: scale(1.08); opacity: 1; }
+
+        /* Shine sweep on the back */
+        .shine::before {
+          content: ''; position: absolute; inset: -40%;
+          background: conic-gradient(from 0deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 30%);
+          transform: rotate(0deg); animation: sweep 4.5s linear infinite;
+          pointer-events: none;
         }
-        @keyframes firewerk {
-          0% { transform: scale(0) rotate(0deg); opacity: 1; }
-          50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
-          100% { transform: scale(2) rotate(360deg); opacity: 0; }
+        @keyframes sweep { to { transform: rotate(360deg); } }
+
+        .metric {
+          background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+          border: 1px solid rgba(255,255,255,0.16);
+          backdrop-filter: blur(6px);
         }
-        @keyframes textGlow {
-          0%, 100% {
-            text-shadow:
-              0 0 10px rgba(255,215,0,0.8),
-              0 0 20px rgba(255,215,0,0.5),
-              0 0 30px rgba(255,215,0,0.3);
-          }
-          50% {
-            text-shadow:
-              0 0 15px rgba(255,215,0,1),
-              0 0 30px rgba(255,215,0,0.8),
-              0 0 45px rgba(255,215,0,0.5);
-          }
+
+        /* Circular reveal ring (front) */
+        .ring {
+          --size: 220px;
+          width: var(--size);
+          height: var(--size);
+          border-radius: 9999px;
+          position: relative;
+          display: grid;
+          place-items: center;
+          background:
+            radial-gradient(closest-side, rgba(0,0,0,0) 80%, transparent 81% 100%),
+            conic-gradient(#ffd84d ${frontProgress}%, rgba(255,255,255,0.15) 0);
+          transition: background 120ms linear;
         }
-        @keyframes borderPulse {
-          0%, 100% { background-size: 200% 200%; background-position: 0% 50%; }
-          50% { background-size: 200% 200%; background-position: 100% 50%; }
+        .ring img {
+          width: calc(var(--size) - 20px);
+          height: calc(var(--size) - 20px);
+          border-radius: 18px;
+          object-fit: cover; object-position: top;
+          filter: blur(9px) brightness(0.85) saturate(0.85);
         }
-        .card-container {
-          animation: ${showCard ? 'cardDrop 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards' : 'none'};
-          transform-style: preserve-3d;
-          perspective: 1200px;
+
+        /* Background aurora + vignette */
+        .bg-aurora {
+          position: absolute; inset: 0; overflow: hidden;
+          background:
+            radial-gradient(120% 120% at 50% 50%, rgba(0,0,0,0.6), rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.9) 100%),
+            #030712;
         }
-        .card-floating { animation: cardFloat 6s ease-in-out infinite; }
-        .card-flip-container { position: relative; transform-style: preserve-3d; animation: ${flipCard ? 'cardFlip 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards' : 'none'}; }
-        .card-shimmer { position: relative; overflow: hidden; }
-        .card-shimmer::before {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-          animation: shimmer 3s infinite;
+        .bg-aurora::after {
+          content: ''; position: absolute; inset: -20%;
+          background:
+            radial-gradient(40% 30% at 20% 20%, rgba(59,130,246,0.25), transparent 60%),
+            radial-gradient(35% 35% at 80% 30%, rgba(16,185,129,0.25), transparent 60%),
+            radial-gradient(45% 40% at 60% 80%, rgba(236,72,153,0.20), transparent 60%);
+          filter: blur(40px);
+          animation: auroraShift 20s ease-in-out infinite;
         }
-        .confetti-piece { position: absolute; width: 12px; height: 12px; animation: confettiFall 5s linear infinite; }
-        .sparkle { position: absolute; width: 8px; height: 8px; background: #FFD700; border-radius: 50%; animation: sparkle 2.5s ease-in-out infinite; }
-        .firework { position: absolute; width: 60px; height: 60px; border-radius: 50%; animation: firewerk 2s ease-out infinite; }
-        .premium-card {
-          background: linear-gradient(145deg,#0a0e27 0%,#16213e 15%,#1e3a8a 35%,#312e81 50%,#1e3a8a 65%,#16213e 85%,#0a0e27 100%);
-          border: 8px solid transparent; background-clip: padding-box; position: relative;
-        }
-        .premium-card::before {
-          content: ''; position: absolute; inset: -8px;
-          background: linear-gradient(45deg,#ffd700 0%, #ff6b35 12.5%, #4ecdc4 25%, #45b7d1 37.5%, #96ceb4 50%, #ffeaa7 62.5%, #dda0dd 75%, #98d8c8 87.5%, #ffd700 100%);
-          background-size: 200% 200%; animation: borderPulse 4s ease infinite; border-radius: 24px; z-index: -1;
-        }
-        .team-pulse { animation: teamPulse 3s ease-in-out infinite; }
-        .text-glow { animation: textGlow 2.5s ease-in-out infinite; }
-        .blur-heavy { filter: blur(20px) brightness(0.6) contrast(0.8); }
-        .card-back { transform: rotateY(0deg); backface-visibility: hidden; }
-        .card-front { transform: rotateY(180deg); backface-visibility: hidden; }
-        .rarity-glow {
-          background: radial-gradient(circle at center, rgba(255,215,0,0.25) 0%, rgba(255,165,0,0.2) 25%, rgba(138,43,226,0.15) 50%, rgba(75,0,130,0.1) 75%, transparent 90%);
-          animation: pulseGlow 4s ease-in-out infinite;
-        }
-        .holographic {
-          background: linear-gradient(45deg, rgba(255,0,150,0.1) 0%, rgba(0,255,255,0.1) 25%, rgba(255,255,0,0.1) 50%, rgba(255,0,255,0.1) 75%, rgba(0,255,0,0.1) 100%);
-          background-size: 300% 300%; animation: borderPulse 3s ease infinite;
+        .vignette {
+          position: absolute; inset: 0;
+          background: radial-gradient(100% 100% at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%);
+          pointer-events: none;
         }
       `}</style>
 
-      <div className="fixed inset-0 bg-gradient-to-br from-black via-purple-950/90 to-black backdrop-blur-md flex items-center justify-center z-50" data-testid="celebration-popup">
-        {/* Confetti + sparkles */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {confetti.map((piece) => {
-            let shape = '';
-            switch (piece.type) {
-              case 'triangle': shape = 'polygon(50% 0%, 0% 100%, 100% 100%)'; break;
-              case 'star': shape = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'; break;
-              case 'heart': shape = ''; break; // let borderRadius/size handle
-              case 'square': shape = 'none'; break;
-              default: shape = 'none';
-            }
-            return (
-              <div
-                key={piece.id}
-                className="confetti-piece"
-                style={{
-                  left: `${piece.left}%`,
-                  animationDelay: `${piece.delay}ms`,
-                  backgroundColor: piece.color,
-                  borderRadius: piece.type === 'circle' ? '50%' : piece.type === 'square' ? '2px' : '0',
-                  clipPath: shape || 'none',
-                  width: piece.type === 'star' ? '16px' : '12px',
-                  height: piece.type === 'star' ? '16px' : '12px',
-                }}
-              />
-            );
-          })}
+      <div className="fixed inset-0 z-[60]">
+        {/* Animated background */}
+        <div className="bg-aurora" />
+        <div className="vignette" />
 
-          {Array.from({ length: 40 }, (_, i) => (
-            <div
-              key={`sparkle-${i}`}
-              className="sparkle"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 4}s`,
-                background: i % 4 === 0 ? '#FFD700' : i % 4 === 1 ? '#FF6B35' : i % 4 === 2 ? '#4ECDC4' : '#FF69B4',
-                width: `${6 + Math.random() * 4}px`,
-                height: `${6 + Math.random() * 4}px`,
-              }}
-            />
-          ))}
+        {/* Parallax orbs */}
+        <div className="pointer-events-none absolute -top-20 -left-28 w-96 h-96 rounded-full blur-3xl opacity-20 bg-cyan-400" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 w-[34rem] h-[34rem] rounded-full blur-3xl opacity-15 bg-fuchsia-500" />
+      </div>
 
-          {showFireworks &&
-            Array.from({ length: 8 }, (_, i) => (
-              <div
-                key={`firework-${i}`}
-                className="firework"
-                style={{
-                  left: `${20 + i * 10}%`,
-                  top: `${20 + Math.random() * 60}%`,
-                  background: `radial-gradient(circle, ${confetti[i % confetti.length]?.color || '#FFD700'} 20%, transparent 70%)`,
-                  animationDelay: `${i * 0.3}s`,
-                }}
-              />
-            ))}
-        </div>
+      {/* Confetti layer (pops post-flip) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-[61]">
+        {confetti.map((piece) => (
+          <div
+            key={piece.id}
+            className="confetti-piece"
+            style={{
+              left: `${piece.left}%`,
+              animationDelay: `${piece.delay}ms`,
+              backgroundColor: piece.color,
+              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+            }}
+          />
+        ))}
+      </div>
 
-        {/* Premium Card */}
-        <div className={`card-container ${showCard ? 'card-floating' : ''}`}>
-          <div className="card-flip-container">
-            <div className="premium-card card-shimmer shadow-2xl w-96 h-[620px] mx-4 relative overflow-hidden rounded-3xl">
-              <div className="rarity-glow absolute inset-0" />
-              <div className="holographic absolute inset-0 opacity-30" />
+      {/* Sound Toggle */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleSound}
+        className="absolute top-4 left-4 text-white/90 hover:text-white hover:bg-white/10 w-9 h-9 p-0 rounded-full z-[65]"
+        data-testid="celebration-sound-toggle"
+        title={isSoundEnabled ? 'Mute' : 'Unmute'}
+      >
+        {isSoundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+      </Button>
 
-              {/* Back (tease) */}
-              <div className={`card-back absolute inset-0 p-8 flex flex-col justify-center items-center transition-opacity duration-500 ${flipCard ? 'opacity-0' : 'opacity-100'}`}>
+      {/* Scene */}
+      <div className="fixed inset-0 flex items-center justify-center z-[64]">
+        <div className="scene">
+          <div className={`card3d ${isFlipped ? 'flipped' : ''} ${mounted && !isFlipped ? 'floaty heartbeat' : ''}`}>
+            {/* FRONT — Suspense state */}
+            <div className="face front relative">
+              <div className="absolute inset-0">
+                <div className="absolute inset-0 bg-[radial-gradient(70%_120%_at_50%_-10%,rgba(255,255,255,0.06),rgba(255,255,255,0)_60%)]" />
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col items-center justify-center p-7 text-white">
+                <div className="text-center mb-6">
+                  <div className="text-xs tracking-[0.28em] opacity-70">INTRODUCING</div>
+                  <div className="mt-2 text-3xl md:text-4xl font-extrabold tracking-wide">{teamLabel}</div>
+                </div>
+
+                {/* Suspense ring with blurred avatar */}
+                <div className="ring select-none">
+                  <img
+                    src={data.photoUrl}
+                    alt={`${agentDisplay} blurred`}
+                    draggable={false}
+                  />
+                </div>
+
+                <div className="mt-6 text-white/80 text-sm md:text-base text-center max-w-[30ch]">
+                  Big moment loading… stay tuned.
+                </div>
+
+                <div className="mt-8">
+                  <Button
+                    onClick={manualReveal}
+                    className="bg-white text-black font-semibold px-5 py-2 rounded-lg hover:opacity-90"
+                  >
+                    Reveal Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* BACK — Reveal state */}
+            <div className="face back relative shine">
+              <div className="absolute inset-0">
+                <div className="absolute -top-12 -left-10 w-64 h-64 rounded-full blur-3xl opacity-25 bg-emerald-400" />
+                <div className="absolute -bottom-12 -right-14 w-72 h-72 rounded-full blur-3xl opacity-20 bg-fuchsia-500" />
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col p-7 text-white">
+                {/* Header row */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-5xl font-black leading-none">99</div>
+                    <div className="text-[10px] font-semibold opacity-80 mt-1 tracking-[0.28em]">ST</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white/12 border border-white/20 text-[11px] font-semibold">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                      SALES CHAMPION
+                    </div>
+                    <div className="mt-2 text-[10px] opacity-75 tracking-widest">{teamLabel}</div>
+                  </div>
+                </div>
+
+                {/* Portrait */}
+                <div className="flex-1 flex items-center justify-center my-6">
+                  <div className="relative">
+                    <img
+                      src={data.photoUrl}
+                      alt={`${data.agentName} celebrating`}
+                      className="w-56 h-64 md:w-60 md:h-72 object-cover object-top rounded-xl ring-2 ring-white/40 shadow-2xl"
+                      data-testid="celebration-agent-photo"
+                    />
+                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                      🎉
+                    </div>
+                  </div>
+                </div>
+
+                {/* Names */}
                 <div className="text-center">
-                  <div className="w-28 h-28 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-full flex items-center justify-center mb-8 mx-auto shadow-2xl relative">
-                    <span className="text-4xl">🏆</span>
-                    <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-ping opacity-20" />
-                  </div>
-
-                  <div className="team-pulse mb-10">
-                    <h2 className="text-4xl font-black text-white tracking-wider mb-3 text-glow">{teamName}</h2>
-                    <div className="h-1.5 bg-gradient-to-r from-transparent via-yellow-400 to-transparent rounded-full mb-2" />
-                    <div className="h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent rounded-full" />
-                  </div>
-
-                  <div className="relative mb-8">
-                    <div className="w-36 h-44 rounded-xl overflow-hidden mx-auto relative">
-                      <img src={agentPhoto} alt="Agent preview" className="w-full h-full object-cover object-top blur-heavy" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent rounded-xl flex items-center justify-center">
-                        <div className="text-6xl animate-pulse">❓</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-yellow-400 text-xl font-bold animate-bounce">🎯 NEW SALE CHAMPION 🎯</div>
-                    <div className="text-white/80 text-lg font-semibold">Ready to Reveal...</div>
-                  </div>
+                  <h3 className="text-2xl md:text-3xl font-extrabold tracking-wide" data-testid="celebration-agent-name">
+                    {agentDisplay.toUpperCase()}
+                  </h3>
+                  <div className="mt-1 text-[11px] tracking-[0.28em] text-white/70">{teamLabel}</div>
                 </div>
-              </div>
 
-              {/* Front (real data) */}
-              <div className={`card-front absolute inset-0 p-8 transition-opacity duration-500 ${flipCard ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="h-full flex flex-col">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="text-left">
-                      <div className="text-6xl font-black text-yellow-400 mb-1 drop-shadow-xl text-glow">{data.newActivationCount}</div>
-                      <div className="text-sm font-bold text-white/90 tracking-wider">SALES</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="w-12 h-7 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center mb-4 shadow-lg">
-                        <div className="text-xs text-white font-bold">★ VIP</div>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-                        <div className="text-xl">🏢</div>
-                      </div>
-                    </div>
+                {/* Metrics */}
+                <div className="grid grid-cols-3 gap-3 mt-6">
+                  <div className="metric rounded-xl px-3 py-3 text-center">
+                    <div className="text-[10px] tracking-widest opacity-80">PAC</div>
+                    <div className="text-xl font-black">85</div>
                   </div>
-
-                  <div className="flex-1 flex items-center justify-center mb-6">
-                    <div className="relative">
-                      <div className="w-52 h-60 bg-gradient-to-b from-transparent via-transparent to-black/40 rounded-2xl overflow-hidden shadow-2xl relative">
-                        <img
-                          src={agentPhoto}
-                          alt={`${agentName} celebrating`}
-                          className="w-full h-full object-cover object-top"
-                          data-testid="celebration-agent-photo"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-                      </div>
-
-                      <div className="absolute -top-4 -right-4 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-black text-sm font-bold px-4 py-3 rounded-full shadow-2xl animate-bounce">
-                        🎉 സെയിൽ! 🎉
-                      </div>
-
-                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-2 rounded-full shadow-xl">
-                        +{data.newActivationCount} Sales Today!
-                      </div>
-                    </div>
+                  <div className="metric rounded-xl px-3 py-3 text-center">
+                    <div className="text-[10px] tracking-widest opacity-80">DRI</div>
+                    <div className="text-xl font-black">86</div>
                   </div>
-
-                  <div className="text-center mb-6">
-                    <h3 className="text-3xl font-black text-white tracking-wider drop-shadow-xl text-glow" data-testid="celebration-agent-name">
-                      {agentName}
-                    </h3>
-                    <div className="text-yellow-400 text-sm font-bold mt-2 tracking-wide">{teamName}</div>
-                    <div className="text-white/70 text-xs mt-1">Agent ID: {data.agentId}</div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 text-white text-sm font-bold mb-6">
-                    <div className="text-center bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur-sm rounded-xl py-3 border border-green-400/30">
-                      <div className="text-xl text-green-400 font-black">98</div>
-                      <div className="text-xs text-green-300">PERFORMANCE</div>
-                    </div>
-                    <div className="text-center bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm rounded-xl py-3 border border-blue-400/30">
-                      <div className="text-xl text-blue-400 font-black">94</div>
-                      <div className="text-xs text-blue-300">SKILL</div>
-                    </div>
-                    <div className="text-center bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 backdrop-blur-sm rounded-xl py-3 border border-yellow-400/30">
-                      <div className="text-xl text-yellow-400 font-black" data-testid="celebration-activation-count">
-                        {data.newActivationCount}
-                      </div>
-                      <div className="text-xs text-yellow-300">TODAY</div>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="inline-block bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 p-0.5 rounded-full">
-                      <div className="bg-gradient-to-r from-purple-900/90 to-pink-900/90 px-6 py-3 rounded-full backdrop-blur-sm">
-                        <div className="text-sm text-white font-bold flex items-center gap-2">⭐ സെയിൽസ് ലെജൻഡ് ⭐</div>
-                      </div>
+                  <div className="metric rounded-xl px-3 py-3 text-center">
+                    <div className="text-[10px] tracking-widest opacity-80">ACT</div>
+                    <div className="text-xl font-black text-emerald-400" data-testid="celebration-activation-count">
+                      {data.newActivationCount}
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Sound Toggle (real-time store) */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleSound}
-                className="absolute top-4 left-4 text-white/80 hover:text-white hover:bg-white/20 w-12 h-12 p-0 rounded-full z-10 backdrop-blur-sm border border-white/20"
-                data-testid="celebration-sound-toggle"
-                title={isSoundEnabled ? 'Mute' : 'Unmute'}
-              >
-                {isSoundEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-              </Button>
+                {/* CTA */}
+                <div className="mt-6 flex items-center justify-center">
+                  <Button
+                    onClick={onClose}
+                    className="bg-gradient-to-r from-yellow-300 via-amber-300 to-orange-300 text-black font-extrabold px-7 py-3 rounded-xl shadow-lg hover:brightness-110 transition"
+                    data-testid="celebration-close"
+                  >
+                    AWESOME! 🏆
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Close */}
-          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2">
-            <Button
-              onClick={onClose}
-              className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-300 hover:via-orange-400 hover:to-red-400 text-black font-bold px-10 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 hover:scale-110 text-xl border-2 border-yellow-300/50"
-              data-testid="celebration-close"
-            >
-              🎊 FANTASTIC! 🏆✨
-            </Button>
-          </div>
         </div>
+
+        {/* Tap anywhere to reveal (before auto-flip) */}
+        {!isFlipped && (
+          <button
+            aria-label="Flip card"
+            onClick={manualReveal}
+            className="absolute inset-0"
+            style={{ cursor: 'pointer' }}
+          />
+        )}
       </div>
     </>
   );
