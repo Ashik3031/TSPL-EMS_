@@ -4,6 +4,13 @@ import bcrypt from 'bcryptjs';
 export async function seedData() {
   console.log('Seeding data...');
   
+  // Check if data already exists
+  const existingUsers = await storage.getUserByEmail(process.env.ADMIN_EMAIL || 'admin@example.com');
+  if (existingUsers) {
+    console.log('Data already seeded, skipping...');
+    return;
+  }
+  
   // Create users
   const adminPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin123', 10);
   const tlPassword = await bcrypt.hash(process.env.TL_PASSWORD || 'tl123', 10);

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
 import { storage } from "./storage";
+import { connectToMongoDB } from "./db/connection";
 
 const app = express();
 app.use(express.json());
@@ -55,6 +56,9 @@ function scheduleDailyReset() {
 }
 
 (async () => {
+  // Connect to MongoDB
+  await connectToMongoDB();
+  
   // Seed data on startup
   await seedData();
   
