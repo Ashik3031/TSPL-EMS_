@@ -44,6 +44,20 @@ export class MongoStorage implements IStorage {
     };
   }
 
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const user = await UserModel.findByIdAndUpdate(id, updates, { new: true }).lean();
+    if (!user) return undefined;
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      role: user.role as 'admin' | 'tl',
+      teamId: user.teamId || undefined,
+      avatarUrl: user.avatarUrl || undefined
+    };
+  }
+
   async getTeam(id: string): Promise<Team | undefined> {
     const team = await TeamModel.findById(id).lean();
     if (!team) return undefined;

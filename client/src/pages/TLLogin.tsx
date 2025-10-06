@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Eye, EyeOff, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
-export default function Login() {
+export default function TLLogin() {
   const [, setLocation] = useLocation();
   const { login } = useAuthStore();
   const { toast } = useToast();
@@ -25,20 +25,21 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (data) => {
+      if (data.user.role !== 'tl') {
+        toast({
+          title: 'Access Denied',
+          description: 'This login page is for Team Leaders only',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       login(data.user, data.token);
       toast({
-        title: 'Login Successful',
-        description: `Welcome back, ${data.user.name}!`,
+        title: 'Welcome Back!',
+        description: `Logged in as ${data.user.name}`,
       });
-      
-      // Redirect based on role
-      if (data.user.role === 'admin') {
-        setLocation('/admin');
-      } else if (data.user.role === 'tl') {
-        setLocation('/tl');
-      } else {
-        setLocation('/');
-      }
+      setLocation('/tl');
     },
     onError: (error: Error) => {
       toast({
@@ -64,57 +65,19 @@ export default function Login() {
     loginMutation.mutate({ email, password });
   };
 
-  const handleDemoLogin = (role: 'admin' | 'tl') => {
-    if (role === 'admin') {
-      setEmail('admin@example.com');
-      setPassword('admin123');
-    } else {
-      setEmail('tl@example.com');
-      setPassword('tl123');
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground">Sign in to access the Sales Leaderboard</p>
-        </div>
-
-        {/* Demo Credentials Info */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="pt-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Demo Credentials</h3>
-            <div className="space-y-2 text-sm text-blue-800">
-              <div className="flex justify-between items-center">
-                <span>Admin: admin@example.com / admin123</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleDemoLogin('admin')}
-                  className="text-blue-700 hover:text-blue-900 h-6 px-2"
-                  data-testid="demo-admin-button"
-                >
-                  Fill
-                </Button>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>TL: tl@example.com / tl123</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleDemoLogin('tl')}
-                  className="text-blue-700 hover:text-blue-900 h-6 px-2"
-                  data-testid="demo-tl-button"
-                >
-                  Fill
-                </Button>
-              </div>
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+              <UserCircle className="w-10 h-10 text-white" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">Team Leader Login</h1>
+          <p className="text-muted-foreground">Access your team dashboard</p>
+        </div>
 
         {/* Login Form */}
         <Card>
@@ -123,19 +86,22 @@ export default function Login() {
               <LogIn className="w-5 h-5" />
               <span>Sign In</span>
             </CardTitle>
+            <CardDescription>
+              Enter your credentials to manage your team
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loginMutation.isPending}
-                  data-testid="login-email-input"
+                  data-testid="tl-login-email-input"
                 />
               </div>
 
@@ -150,7 +116,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loginMutation.isPending}
                     className="pr-10"
-                    data-testid="login-password-input"
+                    data-testid="tl-login-password-input"
                   />
                   <Button
                     type="button"
@@ -159,7 +125,7 @@ export default function Login() {
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loginMutation.isPending}
-                    data-testid="password-toggle-button"
+                    data-testid="tl-password-toggle-button"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4 text-muted-foreground" />
@@ -174,7 +140,7 @@ export default function Login() {
                 type="submit"
                 className="w-full"
                 disabled={loginMutation.isPending}
-                data-testid="login-submit-button"
+                data-testid="tl-login-submit-button"
               >
                 {loginMutation.isPending ? (
                   <div className="flex items-center space-x-2">
@@ -192,33 +158,44 @@ export default function Login() {
           </CardContent>
         </Card>
 
-        {/* Other Options */}
+        {/* Registration Link */}
         <div className="text-center space-y-3">
           <p className="text-sm text-muted-foreground">
-            Team Leader?
+            Don't have a Team Leader account?
           </p>
           <Button
             variant="outline"
-            onClick={() => setLocation('/tl-login')}
-            data-testid="tl-login-link"
+            onClick={() => setLocation('/tl-register')}
+            data-testid="tl-register-link"
             className="w-full"
           >
-            Team Leader Login
+            Create New Account
           </Button>
         </div>
 
-        {/* Public Access */}
+        {/* Other Options */}
         <div className="text-center border-t pt-4">
           <p className="text-sm text-muted-foreground mb-2">
-            Want to view the public leaderboard?
+            Not a Team Leader?
           </p>
-          <Button
-            variant="ghost"
-            onClick={() => setLocation('/')}
-            data-testid="public-leaderboard-button"
-          >
-            View Public Leaderboard
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setLocation('/login')}
+              data-testid="admin-login-link"
+              className="flex-1"
+            >
+              Admin Login
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setLocation('/')}
+              data-testid="public-leaderboard-link"
+              className="flex-1"
+            >
+              View Leaderboard
+            </Button>
+          </div>
         </div>
       </div>
     </div>

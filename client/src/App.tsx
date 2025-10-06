@@ -11,6 +11,8 @@ import Leaderboard from "@/pages/Leaderboard";
 import TLDashboard from "@/pages/TLDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Login from "@/pages/Login";
+import TLLogin from "@/pages/TLLogin";
+import TLRegister from "@/pages/TLRegister";
 import NotFound from "@/pages/not-found";
 
 // Auth guard component
@@ -33,6 +35,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Leaderboard} />
       <Route path="/login" component={Login} />
+      <Route path="/tl-login" component={TLLogin} />
+      <Route path="/tl-register" component={TLRegister} />
       
       {/* Protected routes - always declared */}
       <Route path="/tl">

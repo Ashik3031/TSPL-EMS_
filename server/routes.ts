@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { authenticate, requireRole, requireTLOrAdmin } from "./middleware/auth";
 import { computeLeaderboard } from "./utils/computeLeaderboard";
 import { computeTopStats } from "./utils/topStats";
-import { loginSchema, tlUpdateSchema, insertNotificationSchema, insertAgentSchema } from "@shared/schema";
+import { loginSchema, registerSchema, tlUpdateSchema, insertNotificationSchema, insertAgentSchema } from "@shared/schema";
 
 // Rate limiting
 const tlUpdateLimiter = rateLimit({
@@ -236,6 +236,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(400).json({ message: 'Invalid request data' });
+    }
+  });
+
+  app.post('/api/auth/register/tl', async (req, res) => {
+    try {
+      const { name, email, password, teamName } = registerSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email already registered' });
+      }
+      
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      // Create TL user
+      const user = await storage.createUser({
+        name,
+        email,
+        passwordHash,
+        role: 'tl',
+        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+      });
+      
+      // Create team for the TL
+      const team = await storage.createTeam({
+        name: teamName,
+        tlId: user.id,
+        agents: [],
+        avgActivation: 0,
+        totalActivations: 0,
+        totalSubmissions: 0,
+        totalPoints: 0
+      });
+      
+      // Update user with teamId
+      await storage.updateUser(user.id, { teamId: team.id });
+      
+      // Generate token
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET || 'supersecret',
+        { expiresIn: '24h' }
+      );
+      
+      res.status(201).json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          teamId: team.id,
+          avatarUrl: user.avatarUrl
+        }
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error('Registration error:', error);
+      res.status(500).json({ message: 'Registration failed' });
     }
   });
 
