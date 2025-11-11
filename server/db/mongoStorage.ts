@@ -3,6 +3,9 @@ import { UserModel, TeamModel, AgentModel, NotificationModel } from "./models";
 import { IStorage } from "../storage";
 
 export class MongoStorage implements IStorage {
+  getTeamById(teamId: any): any {
+    throw new Error("Method not implemented.");
+  }
   async getUser(id: string): Promise<User | undefined> {
     const user = await UserModel.findById(id).lean();
     if (!user) return undefined;

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAudioStore } from '@/store/audioStore';
 
 interface CelebrationData {
   agentId: string;
   agentName: string;
   photoUrl: string;
-  teamId: string; // swap to teamName if available
+  teamName?: string;
+  teamId?: string;
   newActivationCount: number;
   timestamp: string;
 }
@@ -19,9 +19,19 @@ interface CelebrationPopupProps {
   bgMusicUrl?: string;
   musicVolume?: number;
   duckedVolume?: number;
-  flipDelayMs?: number;
+  countdownSeconds?: number;
   autoCloseMs?: number;
+  videoUrl?: string;
 }
+
+// Mock audio store for demo
+const useAudioStore = () => {
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  return {
+    isSoundEnabled,
+    toggleSound: () => setIsSoundEnabled(!isSoundEnabled)
+  };
+};
 
 export default function CelebrationPopup({
   isVisible,
@@ -30,23 +40,22 @@ export default function CelebrationPopup({
   bgMusicUrl = 'https://res.cloudinary.com/dxq0nrirt/video/upload/v1758179396/ssvid.net--Rolex-Theme-Video-Vikram-Kamal-Haasan-ANIRUDH_128kbps.m4a_maxsqf.mp3',
   musicVolume = 0.25,
   duckedVolume = 0.08,
-  flipDelayMs = 2600,   // longer suspense window
-  autoCloseMs = 9500,   // slightly longer overall
+  countdownSeconds = 3,
+  autoCloseMs = 12000,
+  videoUrl = 'https://cdn.coverr.co/videos/coverr-confetti-people-celebrating-6388/1080p.mp4'
 }: CelebrationPopupProps) {
   const { isSoundEnabled, toggleSound } = useAudioStore();
 
-  const [mounted, setMounted] = useState(false);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [confetti, setConfetti] = useState<Array<{ id: number; left: number; delay: number; color: string }>>([]);
-  const [frontProgress, setFrontProgress] = useState(0); // ring progress 0-100
+  const [countdown, setCountdown] = useState(countdownSeconds);
+  const [showCard, setShowCard] = useState(false);
+  const [poppers, setPoppers] = useState<Array<{ id: number; side: 'left' | 'right' }>>([]);
+  const [continuousGlitters, setContinuousGlitters] = useState<Array<{ id: number; x: number; y: number; delay: number }>>([]);
 
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const voiceRef = useRef<HTMLAudioElement | null>(null);
   const voiceUrlRef = useRef<string | null>(null);
 
-  const teamLabel = data?.teamId ? `TEAM ${String(data.teamId).toUpperCase()}` : 'TEAM';
   const agentDisplay = (data?.agentName || 'ഏജന്റ്').trim();
-
   const buildSentence = () => `${agentDisplay} ഒരു സെയിൽ ഇട്ടു, നന്ദി!`;
 
   const startMusic = async () => {
@@ -94,373 +103,603 @@ export default function CelebrationPopup({
     } catch {}
   };
 
+  const triggerPoppers = () => {
+    setPoppers([
+      { id: Date.now(), side: 'left' },
+      { id: Date.now() + 1, side: 'right' }
+    ]);
+  };
+
+  const generateContinuousGlitters = () => {
+    const interval = setInterval(() => {
+      const newGlitters = Array.from({ length: 8 }, (_, i) => ({
+        id: Date.now() + i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        delay: Math.random() * 200
+      }));
+      setContinuousGlitters(prev => [...prev.slice(-50), ...newGlitters]);
+    }, 400);
+    return interval;
+  };
+
   useEffect(() => {
     if (!isVisible || !data) return;
-    setMounted(true);
-    setIsFlipped(false);
-    setFrontProgress(0);
 
-    // background confetti prepared but mostly hidden until flip
-    const colors = ['#FFD700','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8'];
-    setConfetti(Array.from({ length: 110 }, (_, i) => ({
-      id: i, left: Math.random()*100, delay: Math.random()*2200, color: colors[Math.floor(Math.random()*colors.length)],
-    })));
+    setCountdown(countdownSeconds);
+    setShowCard(false);
+    setPoppers([]);
+    setContinuousGlitters([]);
 
-    // music now, if allowed
-    (async () => { if (isSoundEnabled) await startMusic(); })();
+    if (isSoundEnabled) startMusic();
 
-    // progress ring animation for suspense
-    const started = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - started;
-      const pct = Math.min(100, (elapsed / flipDelayMs) * 100);
-      setFrontProgress(pct);
-      if (pct < 100 && mounted) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    const countdownInterval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-    // flip + voice timing
-    const flipTimer = setTimeout(async () => {
-      setIsFlipped(true);
-      // voice a beat after the flip for dramatic reveal
-      if (isSoundEnabled) setTimeout(() => playVoice(), 420);
-    }, flipDelayMs);
+    let glitterInterval: NodeJS.Timeout;
 
-    // auto close
-    const closeTimer = setTimeout(onClose, autoCloseMs);
+    const showCardTimer = setTimeout(() => {
+      setShowCard(true);
+      triggerPoppers();
+      glitterInterval = generateContinuousGlitters();
+      if (isSoundEnabled) setTimeout(() => playVoice(), 250);
+    }, countdownSeconds * 1000);
+
+    const closeTimer = setTimeout(onClose, countdownSeconds * 1000 + autoCloseMs);
 
     return () => {
-      clearTimeout(flipTimer);
+      clearInterval(countdownInterval);
+      clearTimeout(showCardTimer);
       clearTimeout(closeTimer);
-      setMounted(false);
-      setIsFlipped(false);
+      if (glitterInterval) clearInterval(glitterInterval);
 
-      if (voiceRef.current) { try { voiceRef.current.pause(); } catch {} voiceRef.current.src=''; voiceRef.current=null; }
-      if (voiceUrlRef.current) { URL.revokeObjectURL(voiceUrlRef.current); voiceUrlRef.current=null; }
+      if (voiceRef.current) {
+        try { voiceRef.current.pause(); } catch {}
+        voiceRef.current.src = '';
+        voiceRef.current = null;
+      }
+      if (voiceUrlRef.current) {
+        URL.revokeObjectURL(voiceUrlRef.current);
+        voiceUrlRef.current = null;
+      }
       stopMusic();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible, data, isSoundEnabled, onClose, autoCloseMs, flipDelayMs]);
-
-  const manualReveal = () => {
-    if (!isFlipped) {
-      setIsFlipped(true);
-      if (isSoundEnabled) setTimeout(() => playVoice(), 320);
-    }
-  };
+  }, [isVisible, data, isSoundEnabled, onClose, autoCloseMs, countdownSeconds]);
 
   if (!isVisible || !data) return null;
 
   return (
     <>
       <style jsx>{`
-        /* Popup entrance */
-        @keyframes popIn {
-          0% { opacity: 0; transform: scale(0.96) translateY(6px); }
-          60% { opacity: 1; transform: scale(1.01) translateY(0); }
-          100% { opacity: 1; transform: scale(1); }
+        @keyframes countdownPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.15); opacity: 0.85; }
+        }
+        .countdown-number {
+          animation: countdownPulse 1s ease-in-out;
         }
 
-        /* Aurora background movement */
-        @keyframes auroraShift {
-          0% { transform: translateX(-10%) translateY(-6%) rotate(0deg); }
-          50% { transform: translateX(8%) translateY(6%) rotate(6deg); }
-          100% { transform: translateX(-10%) translateY(-6%) rotate(0deg); }
+        @keyframes cardEnter {
+          0% { transform: scale(0.9) translateY(30px); opacity: 0; }
+          60% { transform: scale(1.02) translateY(-5px); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .card-enter {
+          animation: cardEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
 
-        /* Scene */
-        .scene {
-          perspective: 1600px;
-          animation: popIn 480ms ease forwards;
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .float-animation {
+          animation: float 3s ease-in-out infinite;
         }
 
-        .card3d {
-          width: min(88vw, 440px);       /* narrower card */
-          height: min(82vh, 660px);
-          max-height: 660px;
-          transform-style: preserve-3d;
-          transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
-          position: relative;
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+        .shimmer {
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+          background-size: 1000px 100%;
+          animation: shimmer 2s infinite;
+        }
+
+        @keyframes fadeOut {
+          from { opacity: 1; transform: scale(1); }
+          to { opacity: 0; transform: scale(0.95); }
+        }
+        .fade-out {
+          animation: fadeOut 0.3s ease-out forwards;
+        }
+
+        .popper-skyburst {
+          position: absolute;
+          top: 50%;
+          width: 0;
+          height: 0;
+          pointer-events: none;
           will-change: transform;
         }
-        .card3d.flipped { transform: rotateY(180deg); }
+        .popper-left { left: 10%; }
+        .popper-right { right: 10%; }
 
-        .face {
+        .flash {
           position: absolute;
-          inset: 0;
-          backface-visibility: hidden;
-          border-radius: 22px;
-          overflow: hidden;
-          box-shadow: 0 28px 80px rgba(0,0,0,0.5);
-          border: 1px solid rgba(255,255,255,0.08);
+          left: 0;
+          top: 0;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          transform: translate(-50%, -50%) scale(0.3);
+          background: radial-gradient(circle, #fff, #ffd700 40%, rgba(255,200,0,0.3) 70%, transparent 90%);
+          animation: flashPop 300ms ease-out forwards;
+        }
+        @keyframes flashPop {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+          40% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(2.8); }
         }
 
-        /* FRONT: darker, suspense */
-        .front {
-          background:
-            radial-gradient(120% 120% at 50% 10%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 48%),
-            linear-gradient(135deg, #060b17 0%, #0a1228 35%, #0f1c3f 100%);
-        }
-
-        /* BACK: luxe glass-metal */
-        .back {
-          transform: rotateY(180deg);
-          background:
-            radial-gradient(120% 140% at 50% -10%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 50%, transparent 70%),
-            linear-gradient(135deg, #0d1326 0%, #101833 40%, #0b1020 100%);
-        }
-
-        /* Float & heartbeat on front for tension */
-        .floaty { animation: floaty 3.2s ease-in-out infinite; }
-        @keyframes floaty { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
-
-        .heartbeat { animation: heartbeat 1500ms ease-in-out infinite; }
-        @keyframes heartbeat {
-          0%, 100% { transform: scale(1); }
-          25% { transform: scale(1.01); }
-          40% { transform: scale(0.995); }
-          60% { transform: scale(1.012); }
-        }
-
-        /* Confetti (only impactful post-flip) */
-        @keyframes confettiFall {
-          0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
-        }
-        .confetti-piece {
-          position: absolute; width: 10px; height: 10px;
-          animation: confettiFall 3.2s linear infinite;
-          border-radius: 2px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
-          opacity: ${isFlipped ? 1 : 0}; transition: opacity 220ms ease;
-        }
-
-        /* Shine sweep on the back */
-        .shine::before {
-          content: ''; position: absolute; inset: -40%;
-          background: conic-gradient(from 0deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 30%);
-          transform: rotate(0deg); animation: sweep 4.5s linear infinite;
-          pointer-events: none;
-        }
-        @keyframes sweep { to { transform: rotate(360deg); } }
-
-        .metric {
-          background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
-          border: 1px solid rgba(255,255,255,0.16);
-          backdrop-filter: blur(6px);
-        }
-
-        /* Circular reveal ring (front) */
         .ring {
-          --size: 220px;
-          width: var(--size);
-          height: var(--size);
-          border-radius: 9999px;
-          position: relative;
-          display: grid;
-          place-items: center;
-          background:
-            radial-gradient(closest-side, rgba(0,0,0,0) 80%, transparent 81% 100%),
-            conic-gradient(#ffd84d ${frontProgress}%, rgba(255,255,255,0.15) 0);
-          transition: background 120ms linear;
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 12px;
+          height: 12px;
+          border-radius: 999px;
+          border: 4px solid rgba(255,215,0,0.9);
+          transform: translate(-50%, -50%) scale(0.2);
+          opacity: 0.9;
+          animation: ringOut 600ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+          filter: drop-shadow(0 0 15px rgba(255,215,0,0.5));
         }
-        .ring img {
-          width: calc(var(--size) - 20px);
-          height: calc(var(--size) - 20px);
-          border-radius: 18px;
-          object-fit: cover; object-position: top;
-          filter: blur(9px) brightness(0.85) saturate(0.85);
+        @keyframes ringOut {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+          25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(10); }
         }
 
-        /* Background aurora + vignette */
-        .bg-aurora {
-          position: absolute; inset: 0; overflow: hidden;
-          background:
-            radial-gradient(120% 120% at 50% 50%, rgba(0,0,0,0.6), rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.9) 100%),
-            #030712;
+        .comet {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: var(--cw, 16px);
+          height: var(--ch, 4px);
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(255,255,255,1), rgba(255,215,0,0.8) 40%, transparent 100%);
+          transform-origin: left center;
+          filter: drop-shadow(0 0 8px rgba(255,215,0,0.6));
+          will-change: transform, opacity;
+          animation: 
+            cometBurst var(--t1, 400ms) cubic-bezier(0.15, 0.95, 0.25, 1) var(--d, 0ms) forwards,
+            cometDrift var(--t2, 1400ms) ease-out calc(var(--d, 0ms) + var(--t1, 400ms)) forwards;
         }
-        .bg-aurora::after {
-          content: ''; position: absolute; inset: -20%;
-          background:
-            radial-gradient(40% 30% at 20% 20%, rgba(59,130,246,0.25), transparent 60%),
-            radial-gradient(35% 35% at 80% 30%, rgba(16,185,129,0.25), transparent 60%),
-            radial-gradient(45% 40% at 60% 80%, rgba(236,72,153,0.20), transparent 60%);
-          filter: blur(40px);
-          animation: auroraShift 20s ease-in-out infinite;
+        @keyframes cometBurst {
+          0% { transform: translate(0, 0) rotate(var(--r0, 0deg)) scaleX(0.6); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r1, 360deg)) scaleX(1); opacity: 1; }
         }
-        .vignette {
-          position: absolute; inset: 0;
-          background: radial-gradient(100% 100% at 50% 50%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%);
+        @keyframes cometDrift {
+          0% { transform: translate(var(--tx), var(--ty)) rotate(var(--r1, 360deg)); opacity: 1; }
+          100% { 
+            transform: translate(calc(var(--tx) + var(--fx)), calc(var(--ty) + var(--fy))) rotate(calc(var(--r1, 360deg) + 180deg));
+            opacity: 0;
+          }
+        }
+
+        .star {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: var(--s, 12px);
+          height: var(--s, 12px);
+          transform: translate(-50%, -50%) rotate(45deg) scale(0.5);
+          background: var(--c, #FFD700);
+          filter: drop-shadow(0 0 8px rgba(255,215,0,0.8));
+          opacity: 1;
+          will-change: transform, opacity;
+          animation: 
+            starFly var(--st1, 450ms) cubic-bezier(0.18, 0.9, 0.28, 1) var(--sd, 0ms) forwards,
+            starFade var(--st2, 1000ms) ease-out calc(var(--sd, 0ms) + var(--st1, 450ms)) forwards;
+        }
+        @keyframes starFly {
+          0% { transform: translate(-50%, -50%) rotate(45deg) scale(0.5); }
+          100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(45deg) scale(1.2); }
+        }
+        @keyframes starFade {
+          0% { opacity: 1; }
+          100% { 
+            opacity: 0;
+            transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) + 100px)) rotate(45deg) scale(1.2);
+          }
+        }
+
+        .glitter {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: var(--g, 8px);
+          height: var(--g, 8px);
+          border-radius: 50%;
+          transform: translate(-50%, -50%) scale(0.6);
+          background: radial-gradient(circle, #fff, rgba(255,255,255,0) 70%);
+          filter: drop-shadow(0 0 10px rgba(255,255,255,1));
+          will-change: transform, opacity;
+          animation: glitterOut var(--gt, 800ms) ease-out var(--gd, 0ms) forwards;
+        }
+        @keyframes glitterOut {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+          35% { opacity: 1; }
+          100% { 
+            opacity: 0;
+            transform: translate(calc(-50% + var(--gx)), calc(-50% + var(--gy))) scale(0.1);
+          }
+        }
+
+        .continuous-glitter {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
           pointer-events: none;
+          animation: continuousGlitterPop 1.5s ease-out forwards;
+        }
+        @keyframes continuousGlitterPop {
+          0% {
+            opacity: 0;
+            transform: scale(0) rotate(0deg);
+          }
+          10% {
+            opacity: 1;
+            transform: scale(1.5) rotate(90deg);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1) rotate(180deg) translateY(-30px);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(0.3) rotate(360deg) translateY(-80px);
+          }
+        }
+
+        .sparkle-burst {
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          background: white;
+          border-radius: 50%;
+          pointer-events: none;
+          animation: sparkleBurst 1s ease-out forwards;
+          box-shadow: 0 0 10px currentColor;
+        }
+        @keyframes sparkleBurst {
+          0% {
+            opacity: 1;
+            transform: scale(0);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(2);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(0.5) translate(var(--sparkle-x), var(--sparkle-y));
+          }
         }
       `}</style>
 
-      <div className="fixed inset-0 z-[60]">
-        {/* Animated background */}
-        <div className="bg-aurora" />
-        <div className="vignette" />
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gradient-to-br from-black/70 via-purple-900/30 to-black/70 backdrop-blur-sm">
+        {/* Sound Toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSound}
+          className="absolute top-6 right-6 text-white/90 hover:text-white hover:bg-white/10 w-11 h-11 p-0 rounded-full z-[65] transition-all duration-300 hover:scale-110"
+          data-testid="celebration-sound-toggle"
+          title={isSoundEnabled ? 'Mute' : 'Unmute'}
+        >
+          {isSoundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+        </Button>
 
-        {/* Parallax orbs */}
-        <div className="pointer-events-none absolute -top-20 -left-28 w-96 h-96 rounded-full blur-3xl opacity-20 bg-cyan-400" />
-        <div className="pointer-events-none absolute -bottom-24 -right-24 w-[34rem] h-[34rem] rounded-full blur-3xl opacity-15 bg-fuchsia-500" />
-      </div>
-
-      {/* Confetti layer (pops post-flip) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-[61]">
-        {confetti.map((piece) => (
-          <div
-            key={piece.id}
-            className="confetti-piece"
-            style={{
-              left: `${piece.left}%`,
-              animationDelay: `${piece.delay}ms`,
-              backgroundColor: piece.color,
-              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Sound Toggle */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={toggleSound}
-        className="absolute top-4 left-4 text-white/90 hover:text-white hover:bg-white/10 w-9 h-9 p-0 rounded-full z-[65]"
-        data-testid="celebration-sound-toggle"
-        title={isSoundEnabled ? 'Mute' : 'Unmute'}
-      >
-        {isSoundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-      </Button>
-
-      {/* Scene */}
-      <div className="fixed inset-0 flex items-center justify-center z-[64]">
-        <div className="scene">
-          <div className={`card3d ${isFlipped ? 'flipped' : ''} ${mounted && !isFlipped ? 'floaty heartbeat' : ''}`}>
-            {/* FRONT — Suspense state */}
-            <div className="face front relative">
-              <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-[radial-gradient(70%_120%_at_50%_-10%,rgba(255,255,255,0.06),rgba(255,255,255,0)_60%)]" />
-              </div>
-
-              <div className="relative z-10 h-full flex flex-col items-center justify-center p-7 text-white">
-                <div className="text-center mb-6">
-                  <div className="text-xs tracking-[0.28em] opacity-70">INTRODUCING</div>
-                  <div className="mt-2 text-3xl md:text-4xl font-extrabold tracking-wide">{teamLabel}</div>
-                </div>
-
-                {/* Suspense ring with blurred avatar */}
-                <div className="ring select-none">
-                  <img
-                    src={data.photoUrl}
-                    alt={`${agentDisplay} blurred`}
-                    draggable={false}
-                  />
-                </div>
-
-                <div className="mt-6 text-white/80 text-sm md:text-base text-center max-w-[30ch]">
-                  Big moment loading… stay tuned.
-                </div>
-
-                <div className="mt-8">
-                  <Button
-                    onClick={manualReveal}
-                    className="bg-white text-black font-semibold px-5 py-2 rounded-lg hover:opacity-90"
-                  >
-                    Reveal Now
-                  </Button>
-                </div>
-              </div>
+        {/* Countdown Screen - Full screen centered */}
+        {!showCard && countdown > 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+            <div className="text-[10rem] md:text-[14rem] font-black countdown-number drop-shadow-2xl" 
+                 style={{ 
+                   background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                   WebkitBackgroundClip: 'text',
+                   WebkitTextFillColor: 'transparent',
+                   textShadow: '0 0 80px rgba(255,215,0,0.5)'
+                 }}
+                 key={countdown}>
+              {countdown}
             </div>
+            <div className="flex items-center gap-3 mt-8">
+              <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
+              <p className="text-2xl md:text-3xl font-bold opacity-90 drop-shadow-lg">
+                Get Ready for Something Special...
+              </p>
+              <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
+            </div>
+          </div>
+        )}
 
-            {/* BACK — Reveal state */}
-            <div className="face back relative shine">
-              <div className="absolute inset-0">
-                <div className="absolute -top-12 -left-10 w-64 h-64 rounded-full blur-3xl opacity-25 bg-emerald-400" />
-                <div className="absolute -bottom-12 -right-14 w-72 h-72 rounded-full blur-3xl opacity-20 bg-fuchsia-500" />
-              </div>
-
-              <div className="relative z-10 h-full flex flex-col p-7 text-white">
-                {/* Header row */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-5xl font-black leading-none">99</div>
-                    <div className="text-[10px] font-semibold opacity-80 mt-1 tracking-[0.28em]">ST</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white/12 border border-white/20 text-[11px] font-semibold">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                      SALES CHAMPION
-                    </div>
-                    <div className="mt-2 text-[10px] opacity-75 tracking-widest">{teamLabel}</div>
-                  </div>
+        {/* Celebration Card - Appears after countdown */}
+        {showCard && (
+          <div className="relative w-full max-w-2xl mx-auto px-4">
+            {/* Continuous Glitters - Keep popping throughout */}
+            {continuousGlitters.map((glitter) => {
+              const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#A78BFA', '#F59E0B', '#F472B6', '#10B981', '#FBBF24', '#EC4899'];
+              const color = colors[Math.floor(Math.random() * colors.length)];
+              return (
+                <div
+                  key={glitter.id}
+                  className="continuous-glitter"
+                  style={{
+                    left: `${glitter.x}%`,
+                    top: `${glitter.y}%`,
+                    background: `radial-gradient(circle, ${color}, transparent 70%)`,
+                    filter: `drop-shadow(0 0 8px ${color})`,
+                    animationDelay: `${glitter.delay}ms`
+                  }}
+                >
+                  {/* Add sparkle bursts around each glitter */}
+                  {Array.from({ length: 6 }).map((_, i) => {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const distance = 15 + Math.random() * 20;
+                    return (
+                      <span
+                        key={i}
+                        className="sparkle-burst"
+                        style={{
+                          '--sparkle-x': `${Math.cos(angle) * distance}px`,
+                          '--sparkle-y': `${Math.sin(angle) * distance}px`,
+                          color: color,
+                          animationDelay: `${glitter.delay + i * 50}ms`
+                        } as React.CSSProperties}
+                      />
+                    );
+                  })}
                 </div>
+              );
+            })}
 
-                {/* Portrait */}
-                <div className="flex-1 flex items-center justify-center my-6">
-                  <div className="relative">
-                    <img
-                      src={data.photoUrl}
-                      alt={`${data.agentName} celebrating`}
-                      className="w-56 h-64 md:w-60 md:h-72 object-cover object-top rounded-xl ring-2 ring-white/40 shadow-2xl"
-                      data-testid="celebration-agent-photo"
-                    />
-                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                      🎉
+            {/* Poppers */}
+            {poppers.map((popper) => {
+              const comets = 40;
+              const stars = 20;
+              const glitters = 30;
+
+              return (
+                <div
+                  key={popper.id}
+                  className={`popper-skyburst ${popper.side === 'left' ? 'popper-left' : 'popper-right'}`}
+                >
+                  <span className="flash" />
+                  <span className="ring" />
+
+                  {Array.from({ length: comets }).map((_, i) => {
+                    const dir = popper.side === 'left' ? 1 : -1;
+                    const spread = Math.PI * 1.8;
+                    const base = popper.side === 'left' ? -Math.PI * 0.1 : Math.PI * 1.1;
+                    const angle = base + (i / comets) * spread * (popper.side === 'left' ? 1 : -1) + (Math.random() - 0.5) * 0.2;
+                    const dist = 250 + Math.random() * 500;
+                    const tx = Math.cos(angle) * dist * dir;
+                    const ty = Math.sin(angle) * dist;
+                    const fx = (Math.random() * 200 - 100);
+                    const fy = 200 + Math.random() * 250;
+                    const r0 = `${Math.random() * 60 - 30}deg`;
+                    const r1 = `${Math.random() * 720 - 360}deg`;
+                    const t1 = 300 + Math.random() * 150;
+                    const t2 = 1200 + Math.random() * 900;
+                    const d = i * 8 + Math.random() * 40;
+                    const cw = 14 + Math.random() * 18;
+                    const ch = 4 + Math.random() * 3;
+
+                    return (
+                      <i
+                        key={`c-${i}`}
+                        className="comet"
+                        style={{
+                          '--tx': `${tx}px`,
+                          '--ty': `${ty}px`,
+                          '--fx': `${fx}px`,
+                          '--fy': `${fy}px`,
+                          '--r0': r0,
+                          '--r1': r1,
+                          '--t1': `${t1}ms`,
+                          '--t2': `${t2}ms`,
+                          '--d': `${d}ms`,
+                          '--cw': `${cw}px`,
+                          '--ch': `${ch}px`,
+                        } as React.CSSProperties}
+                      />
+                    );
+                  })}
+
+                  {Array.from({ length: stars }).map((_, i) => {
+                    const dir = popper.side === 'left' ? 1 : -1;
+                    const ang = Math.random() * Math.PI * 2;
+                    const radius = 150 + Math.random() * 300;
+                    const x = Math.cos(ang) * radius * dir;
+                    const y = Math.sin(ang) * radius;
+                    const st1 = 350 + Math.random() * 160;
+                    const st2 = 900 + Math.random() * 800;
+                    const sd = i * 30 + Math.random() * 70;
+                    const s = 10 + Math.random() * 12;
+                    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#A78BFA', '#F59E0B', '#F472B6', '#10B981'];
+                    const c = colors[Math.floor(Math.random() * colors.length)];
+                    return (
+                      <b
+                        key={`s-${i}`}
+                        className="star"
+                        style={{
+                          '--x': `${x}px`,
+                          '--y': `${y}px`,
+                          '--st1': `${st1}ms`,
+                          '--st2': `${st2}ms`,
+                          '--sd': `${sd}ms`,
+                          '--s': `${s}px`,
+                          '--c': c,
+                          background: c,
+                        } as React.CSSProperties}
+                      />
+                    );
+                  })}
+
+                  {Array.from({ length: glitters }).map((_, i) => {
+                    const dir = popper.side === 'left' ? 1 : -1;
+                    const ang = Math.random() * Math.PI * 2;
+                    const dist = 100 + Math.random() * 280;
+                    const gx = Math.cos(ang) * dist * dir;
+                    const gy = Math.sin(ang) * dist;
+                    const gt = 650 + Math.random() * 600;
+                    const gd = i * 20;
+                    const g = 5 + Math.random() * 8;
+                    return (
+                      <em
+                        key={`g-${i}`}
+                        className="glitter"
+                        style={{
+                          '--gx': `${gx}px`,
+                          '--gy': `${gy}px`,
+                          '--gt': `${gt}ms`,
+                          '--gd': `${gd}ms`,
+                          '--g': `${g}px`,
+                        } as React.CSSProperties}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Main Card */}
+            <div className="card-enter">
+              <div className="relative bg-gradient-to-br from-white via-amber-50/50 to-white backdrop-blur-xl rounded-3xl shadow-2xl p-8 md:p-12 text-center overflow-hidden">
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 shimmer pointer-events-none" />
+                
+                {/* Decorative corner accents */}
+                <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-yellow-400/20 to-transparent rounded-br-full" />
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-orange-400/20 to-transparent rounded-tl-full" />
+
+                {/* Content */}
+                <div className="relative z-10">
+                  {/* Badge */}
+                  <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 text-black text-sm font-bold mb-8 shadow-lg">
+                    <span className="text-lg">🏆</span>
+                    <span>{Math.max(1, data.newActivationCount)} Activation{data.newActivationCount > 1 ? 's' : ''}</span>
+                    <span className="text-lg">🏆</span>
+                  </div>
+
+                  {/* Agent Photo - Larger with animation */}
+                  <div className="flex justify-center mb-8 float-animation">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full blur-xl opacity-60 animate-pulse" />
+                      <img
+                        src={data.photoUrl}
+                        alt={agentDisplay}
+                        className="relative w-48 h-48 md:w-56 md:h-56 object-cover object-top rounded-full ring-8 ring-yellow-400 shadow-2xl"
+                        data-testid="celebration-agent-photo"
+                      />
+                      <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full p-3 shadow-xl">
+                        <Sparkles className="w-8 h-8 text-white" />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Names */}
-                <div className="text-center">
-                  <h3 className="text-2xl md:text-3xl font-extrabold tracking-wide" data-testid="celebration-agent-name">
-                    {agentDisplay.toUpperCase()}
+                  {/* Agent Name */}
+                  <h3 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 mb-3" 
+                      data-testid="celebration-agent-name">
+                    {agentDisplay}
                   </h3>
-                  <div className="mt-1 text-[11px] tracking-[0.28em] text-white/70">{teamLabel}</div>
-                </div>
 
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-3 mt-6">
-                  <div className="metric rounded-xl px-3 py-3 text-center">
-                    <div className="text-[10px] tracking-widest opacity-80">PAC</div>
-                    <div className="text-xl font-black">85</div>
-                  </div>
-                  <div className="metric rounded-xl px-3 py-3 text-center">
-                    <div className="text-[10px] tracking-widest opacity-80">DRI</div>
-                    <div className="text-xl font-black">86</div>
-                  </div>
-                  <div className="metric rounded-xl px-3 py-3 text-center">
-                    <div className="text-[10px] tracking-widest opacity-80">ACT</div>
-                    <div className="text-xl font-black text-emerald-400" data-testid="celebration-activation-count">
-                      {data.newActivationCount}
-                    </div>
-                  </div>
-                </div>
+                  {/* Team Name */}
+                  {data.teamName && (
+                    <p className="text-lg text-gray-600 font-semibold mb-8">
+                      Team {data.teamName}
+                    </p>
+                  )}
 
-                {/* CTA */}
-                <div className="mt-6 flex items-center justify-center">
+                  {/* Congratulations Message */}
+                  <div className="bg-gradient-to-r from-purple-50 via-pink-50 to-purple-50 rounded-2xl p-6 mb-8 shadow-inner">
+                    <p className="text-3xl font-black mb-3">
+                      <span className="inline-block animate-bounce">🎊</span>
+                      {' '}Congratulations!{' '}
+                      <span className="inline-block animate-bounce" style={{ animationDelay: '0.1s' }}>🎊</span>
+                    </p>
+                    <p className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600">
+                      Outstanding Achievement!
+                    </p>
+                    <p className="text-sm text-gray-500 mt-3 font-medium">
+                      {new Date(data.timestamp).toLocaleString('en-US', {
+                        dateStyle: 'long',
+                        timeStyle: 'short'
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Close Button */}
                   <Button
                     onClick={onClose}
-                    className="bg-gradient-to-r from-yellow-300 via-amber-300 to-orange-300 text-black font-extrabold px-7 py-3 rounded-xl shadow-lg hover:brightness-110 transition"
+                    className="w-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-500 text-black font-bold text-lg py-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
                     data-testid="celebration-close"
                   >
-                    AWESOME! 🏆
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Awesome! Keep It Up!
+                    <Sparkles className="w-5 h-5 ml-2" />
                   </Button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Tap anywhere to reveal (before auto-flip) */}
-        {!isFlipped && (
-          <button
-            aria-label="Flip card"
-            onClick={manualReveal}
-            className="absolute inset-0"
-            style={{ cursor: 'pointer' }}
-          />
         )}
       </div>
     </>
   );
 }
+
+// Demo component
+function Demo() {
+  const [showCelebration, setShowCelebration] = useState(false);
+  
+  const mockData: CelebrationData = {
+    agentId: '123',
+    agentName: 'രാജേഷ് കുമാർ',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
+    teamName: 'Sales Champions',
+    teamId: 'team-001',
+    newActivationCount: 3,
+    timestamp: new Date().toISOString()
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <Button
+        onClick={() => setShowCelebration(true)}
+        className="bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-black font-bold text-xl py-6 px-12 rounded-2xl shadow-2xl hover:scale-105 transition-all duration-300"
+      >
+        <Sparkles className="w-6 h-6 mr-2" />
+        Trigger Celebration
+      </Button>
+
+      <CelebrationPopup
+        isVisible={showCelebration}
+        data={mockData}
+        onClose={() => setShowCelebration(false)}
+      />
+    </div>
+  );
+}
+
+export  {Demo};

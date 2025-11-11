@@ -26,19 +26,19 @@ export default function AgentRow({ agent }: AgentRowProps) {
   const colorClasses = getPercentColor(activationPercent);
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
-      <div className="flex items-center space-x-3">
+    <div className="flex items-center justify-between py-1.5 lg:py-3 border-b border-border last:border-b-0">
+      <div className="flex items-center space-x-1.5 lg:space-x-3 min-w-0 flex-1 mr-2">
         <img
           src={agent.photoUrl}
           alt={`${agent.name} photo`}
-          className="w-12 h-12 rounded-full object-cover"
+          className="w-8 h-8 lg:w-12 lg:h-12 rounded-full object-cover flex-shrink-0"
           data-testid={`agent-photo-${agent.id}`}
         />
-        <div>
-          <p className="font-semibold text-foreground" data-testid={`agent-name-${agent.id}`}>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-foreground text-xs lg:text-base truncate" data-testid={`agent-name-${agent.id}`}>
             {agent.name}
           </p>
-          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+          <div className="flex items-center space-x-2 lg:space-x-4 text-[10px] lg:text-sm text-muted-foreground">
             <span data-testid={`agent-activations-${agent.id}`}>
               {agent.activations} activations
             </span>
@@ -48,13 +48,13 @@ export default function AgentRow({ agent }: AgentRowProps) {
           </div>
         </div>
       </div>
-      <div className="text-right">
-        <div className={`text-2xl font-bold ${colorClasses.split(' ')[0]}`} data-testid={`agent-percent-${agent.id}`}>
+      <div className="text-right flex-shrink-0">
+        <div className={`text-base lg:text-2xl font-bold ${colorClasses.split(' ')[0]}`} data-testid={`agent-percent-${agent.id}`}>
           {activationPercent}%
         </div>
-        <div className="w-24 bg-gray-200 rounded-full h-2 mt-1">
+        <div className="w-16 lg:w-24 bg-gray-200 rounded-full h-1.5 lg:h-2 mt-0.5 lg:mt-1">
           <div
-            className={`h-2 rounded-full progress-bar ${colorClasses.split(' ')[1]}`}
+            className={`h-1.5 lg:h-2 rounded-full progress-bar ${colorClasses.split(' ')[1]}`}
             style={{ width: `${Math.min(100, activationPercent)}%` }}
           ></div>
         </div>

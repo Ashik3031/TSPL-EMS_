@@ -30,6 +30,8 @@ const agentSchema = new mongoose.Schema({
   lastSubmissionReset: { type: Date, default: Date.now }
 });
 
+
+
 const notificationSchema = new mongoose.Schema({
   type: { type: String, enum: ['text', 'image', 'video', 'audio'], required: true },
   title: { type: String },

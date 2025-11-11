@@ -1,32 +1,49 @@
-import { useEffect } from 'react';
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useNotificationStore } from '@/store/notificationStore';
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNotificationStore } from "@/store/notificationStore";
 
 export default function NotificationTakeover() {
-  const { 
-    activeNotification, 
-    isVisible, 
-    remainingTime, 
-    clearNotification, 
-    decrementTime 
+  const {
+    activeNotification,
+    isVisible,
+    remainingTime,
+    clearNotification,
+    decrementTime,
   } = useNotificationStore();
+
+  const [muted, setMuted] = useState(true);
+  const [autoplayAllowed, setAutoplayAllowed] = useState(false);
 
   useEffect(() => {
     if (isVisible && remainingTime > 0) {
-      const timer = setInterval(() => {
-        decrementTime();
-      }, 1000);
-
+      const timer = setInterval(() => decrementTime(), 1000);
       return () => clearInterval(timer);
     }
   }, [isVisible, remainingTime, decrementTime]);
 
+  useEffect(() => {
+    const allowed = localStorage.getItem("autoplayAllowed") === "true";
+    setAutoplayAllowed(allowed);
+    if (allowed) setMuted(false);
+  }, []);
+
   if (!isVisible || !activeNotification) return null;
+
+  const handleEnableSound = () => {
+    const video = document.getElementById("notification-video") as HTMLVideoElement;
+    if (video) {
+      video.muted = false;
+      video.play().catch(() => {});
+      setMuted(false);
+      localStorage.setItem("autoplayAllowed", "true");
+      setAutoplayAllowed(true);
+    }
+  };
 
   const renderContent = () => {
     switch (activeNotification.type) {
-      case 'text':
+      case "text":
         return (
           <div className="space-y-6">
             <div className="text-6xl mb-8">📢</div>
@@ -36,34 +53,46 @@ export default function NotificationTakeover() {
           </div>
         );
 
-      case 'image':
+      case "image":
         return (
-          <div>
-            <img
-              src={activeNotification.mediaUrl}
-              alt="Notification image"
-              className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-              data-testid="notification-image"
-            />
+          <img
+            src={activeNotification.mediaUrl}
+            alt="Notification image"
+            className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
+            data-testid="notification-image"
+          />
+        );
+
+      case "video":
+        return (
+          <div className="space-y-4">
+          <video
+  id="notification-video"
+  autoPlay
+  playsInline
+  muted={muted}
+  controls
+  className="max-w-full max-h-[80vh] w-auto h-auto rounded-lg shadow-lg mx-auto object-contain"
+  data-testid="notification-video"
+>
+  <source src={activeNotification.mediaUrl} type="video/mp4" />
+  Your browser does not support the video tag.
+</video>
+
+
+            {/* Show enable button if muted */}
+            {muted && !autoplayAllowed && (
+              <Button
+                onClick={handleEnableSound}
+                className="bg-primary text-white px-4 py-2 rounded-lg"
+              >
+                🔊 Enable Sound
+              </Button>
+            )}
           </div>
         );
 
-      case 'video':
-        return (
-          <div>
-            <video
-              controls
-              autoPlay
-              className="max-w-full h-auto rounded-lg shadow-lg mx-auto"
-              data-testid="notification-video"
-            >
-              <source src={activeNotification.mediaUrl} type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-          </div>
-        );
-
-      case 'audio':
+      case "audio":
         return (
           <div className="space-y-6">
             <div className="text-6xl mb-8">🎵</div>
@@ -92,7 +121,7 @@ export default function NotificationTakeover() {
         <div className="bg-card border-b border-border px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-foreground" data-testid="notification-title">
-              {activeNotification.title || 'Important Announcement'}
+              {activeNotification.title || "Important Announcement"}
             </h2>
             <p className="text-sm text-muted-foreground">Notification from Administration</p>
           </div>
@@ -109,19 +138,17 @@ export default function NotificationTakeover() {
 
         {/* Content */}
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="max-w-4xl w-full text-center">
-            {renderContent()}
-          </div>
+          <div className="max-w-4xl w-full text-center">{renderContent()}</div>
         </div>
 
         {/* Footer */}
         <div className="bg-card border-t border-border px-6 py-4 text-center">
           <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
             <span>
-              This notification will auto-close in{' '}
+              This notification will auto-close in{" "}
               <span className="font-bold" data-testid="notification-remaining-time">
                 {remainingTime}
-              </span>{' '}
+              </span>{" "}
               seconds
             </span>
             <span>•</span>

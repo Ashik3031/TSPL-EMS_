@@ -5,6 +5,7 @@ interface Agent {
   name: string;
   photoUrl: string;
   teamId: string;
+  teamName: string;
   activationTarget: number;
   activations: number;
   submissions: number;

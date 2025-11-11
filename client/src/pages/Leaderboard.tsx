@@ -11,6 +11,7 @@ interface CelebrationData {
   agentName: string;
   photoUrl: string;
   teamId: string;
+  teamName: string;
   newActivationCount: number;
   timestamp: string;
 }
@@ -52,8 +53,8 @@ export default function Leaderboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Error Loading Leaderboard</h1>
-          <p className="text-muted-foreground">Please try refreshing the page</p>
+          <h1 className="text-xl lg:text-2xl font-bold text-foreground mb-2">Error Loading Leaderboard</h1>
+          <p className="text-sm lg:text-base text-muted-foreground">Please try refreshing the page</p>
         </div>
       </div>
     );
@@ -64,18 +65,18 @@ export default function Leaderboard() {
       {/* Top Stats Bar */}
       <TopStats topStats={topStats} />
 
-      {/* Team Cards Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+     {/* Team Cards Grid */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 lg:py-6">
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="bg-card rounded-lg shadow-lg border border-border p-8 animate-pulse">
-                <div className="h-32 bg-muted rounded"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 lg:gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-card rounded-lg shadow-lg border border-border p-3 lg:p-6 animate-pulse">
+                <div className="h-24 lg:h-32 bg-muted rounded"></div>
               </div>
             ))}
           </div>
         ) : teams.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 lg:gap-6">
             {teams.map((team, index) => (
               <TeamCard
                 key={team.id}
@@ -85,9 +86,9 @@ export default function Leaderboard() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
-            <h2 className="text-2xl font-bold text-foreground mb-2">No Teams Available</h2>
-            <p className="text-muted-foreground">Teams will appear here once they are created</p>
+          <div className="text-center py-8 lg:py-12">
+            <h2 className="text-lg lg:text-2xl font-bold text-foreground mb-2">No Teams Available</h2>
+            <p className="text-xs lg:text-base text-muted-foreground">Teams will appear here once they are created</p>
           </div>
         )}
       </div>

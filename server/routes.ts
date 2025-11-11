@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { authenticate, requireRole, requireTLOrAdmin } from "./middleware/auth";
 import { computeLeaderboard } from "./utils/computeLeaderboard";
 import { computeTopStats } from "./utils/topStats";
-import { loginSchema, registerSchema, tlUpdateSchema, insertNotificationSchema, insertAgentSchema } from "@shared/schema";
+import { loginSchema, tlUpdateSchema, insertNotificationSchema, insertAgentSchema } from "@shared/schema";
 
 // Rate limiting
 const tlUpdateLimiter = rateLimit({
@@ -174,133 +174,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth routes
   app.post('/api/auth/login', async (req, res) => {
-    try {
-      const { email, password } = loginSchema.parse(req.body);
-      
-      // Check hardcoded credentials from env
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-      const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-      const tlEmail = process.env.TL_EMAIL || 'tl@example.com';
-      const tlPassword = process.env.TL_PASSWORD || 'tl123';
-      
-      let user = null;
-      
-      if (email === adminEmail && password === adminPassword) {
-        // Find or create admin user
-        user = await storage.getUserByEmail(email);
-        if (!user) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          user = await storage.createUser({
-            name: 'Admin User',
-            email,
-            passwordHash: hashedPassword,
-            role: 'admin',
-            avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
-          });
-        }
-      } else if (email === tlEmail && password === tlPassword) {
-        // Find or create TL user
-        user = await storage.getUserByEmail(email);
-        if (!user) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          user = await storage.createUser({
-            name: 'John Smith',
-            email,
-            passwordHash: hashedPassword,
-            role: 'tl',
-            avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
-          });
-        }
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-      
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET || 'supersecret',
-        { expiresIn: '24h' }
-      );
-      
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          teamId: user.teamId,
-          avatarUrl: user.avatarUrl
-        }
-      });
-    } catch (error) {
-      res.status(400).json({ message: 'Invalid request data' });
-    }
-  });
+  try {
+    const { email, password } = loginSchema.parse(req.body);
 
-  app.post('/api/auth/register/tl', async (req, res) => {
-    try {
-      const { name, email, password, teamName } = registerSchema.parse(req.body);
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email already registered' });
-      }
-      
-      // Hash password
+    // Demo bootstrap creds from env (optional)
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const tlEmail = process.env.TL_EMAIL || 'tl@example.com';
+    const tlPassword = process.env.TL_PASSWORD || 'tl123';
+
+    let user = await storage.getUserByEmail(email);
+
+    // If the user doesn't exist yet, optionally auto-create the demo accounts
+    if (!user && email === adminEmail && password === adminPassword) {
       const passwordHash = await bcrypt.hash(password, 10);
-      
-      // Create TL user
-      const user = await storage.createUser({
-        name,
+      user = await storage.createUser({
+        name: 'Admin User',
+        email,
+        passwordHash,
+        role: 'admin',
+        avatarUrl:
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
+      });
+    } else if (!user && email === tlEmail && password === tlPassword) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      user = await storage.createUser({
+        name: 'John Smith',
         email,
         passwordHash,
         role: 'tl',
-        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+        avatarUrl:
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
       });
-      
-      // Create team for the TL
-      const team = await storage.createTeam({
-        name: teamName,
-        tlId: user.id,
-        agents: [],
-        avgActivation: 0,
-        totalActivations: 0,
-        totalSubmissions: 0,
-        totalPoints: 0
-      });
-      
-      // Update user with teamId
-      await storage.updateUser(user.id, { teamId: team.id });
-      
-      // Generate token
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET || 'supersecret',
-        { expiresIn: '24h' }
-      );
-      
-      res.status(201).json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          teamId: team.id,
-          avatarUrl: user.avatarUrl
-        }
-      });
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ message: error.errors[0].message });
-      }
-      console.error('Registration error:', error);
-      res.status(500).json({ message: 'Registration failed' });
     }
-  });
+
+    // If the user exists (seeded or created), verify password with bcrypt
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET || 'supersecret',
+      { expiresIn: '24h' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        teamId: user.teamId,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ message: 'Invalid request data' });
+  }
+});
 
   app.get('/api/auth/me', authenticate, async (req, res) => {
     res.json({

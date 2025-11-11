@@ -118,22 +118,39 @@ export default function TLDashboard() {
     },
   });
 
-  const handleIncrement = (agentId: string, field: 'submissions' | 'activations' | 'points', delta: number) => {
-    // Send via WebSocket for real-time updates
-    sendWithAuth({
-      type: 'tl:updateCounters',
-      data: {
-        agentId,
-        delta: { [field]: delta }
-      }
-    });
+  // const handleIncrement = (agentId: string, field: 'submissions' | 'activations' | 'points', delta: number) => {
+  //   // Send via WebSocket for real-time updates
+  //   sendWithAuth({
+  //     type: 'tl:updateCounters',
+  //     data: {
+  //       agentId,
+  //       delta: { [field]: delta }
+  //     }
+  //   });
 
-    // Also update via REST API as backup
-    updateMutation.mutate({
-      agentId,
-      delta: { [field]: delta }
-    });
-  };
+  //   // Also update via REST API as backup
+  //   updateMutation.mutate({
+  //     agentId,
+  //     delta: { [field]: delta }
+  //   });
+  // };
+
+  const [isUpdating, setIsUpdating] = useState(false);
+
+const handleIncrement = async (agentId: string, field: 'submissions' | 'activations' | 'points', delta: number) => {
+  if (isUpdating) return;
+  setIsUpdating(true);
+
+  sendWithAuth({
+    type: 'tl:updateCounters',
+    data: { agentId, delta: { [field]: delta } }
+  });
+
+  await updateMutation.mutateAsync({ agentId, delta: { [field]: delta } });
+
+  setTimeout(() => setIsUpdating(false), 300); // 300ms debounce
+};
+
 
   const calculateActivationPercent = (agent: Agent) => {
     return agent.activationTarget > 0 

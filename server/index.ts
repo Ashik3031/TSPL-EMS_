@@ -4,6 +4,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
 import { storage } from "./storage";
 import { connectToMongoDB } from "./db/connection";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
