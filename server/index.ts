@@ -1,4 +1,7 @@
-import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+
+import express, { type Request, type Response, type NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
@@ -6,6 +9,10 @@ import { storage } from "./storage";
 import { connectToMongoDB } from "./db/connection";
 import dotenv from "dotenv";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load env
 dotenv.config();
 
 const app = express();
@@ -14,27 +21,23 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  const reqPath = req.path;
+  let capturedJsonResponse: Record<string, any> | undefined;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  const originalResJson = res.json.bind(res);
+  // @ts-ignore
+  res.json = (bodyJson, ...args) => {
     capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+    // @ts-ignore
+    return originalResJson(bodyJson, ...args);
   };
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (logLine.length > 80) logLine = logLine.slice(0, 79) + "…";
       log(logLine);
     }
   });
@@ -49,58 +52,41 @@ function scheduleDailyReset() {
   const msUntilMidnight = nextMidnight.getTime() - now.getTime();
 
   setTimeout(async () => {
-    log('🔄 Performing daily submission reset...');
+    log("🔄 Performing daily submission reset...");
     await storage.resetDailySubmissions();
-    log('✅ Daily submission reset completed');
-    
-    // Schedule the next reset
+    log("✅ Daily submission reset completed");
     scheduleDailyReset();
   }, msUntilMidnight);
 }
 
 (async () => {
-  // Connect to MongoDB
   await connectToMongoDB();
-  
-  // Seed data on startup
   await seedData();
-  
-  // Perform initial daily reset check
+
   log("🔄 Checking for daily submission reset...");
   await storage.resetDailySubmissions();
   log("✅ Daily submission reset check completed");
 
-  // Schedule daily resets
   scheduleDailyReset();
-  
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     res.status(status).json({ message });
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // pass safe base dir for prod static
+    serveStatic(app, __dirname);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-  }, () => {
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen({ port, host: "0.0.0.0" }, () => {
     log(`🚀 Sales Leaderboard server running on port ${port}`);
     log(`📊 Dashboard: http://localhost:${port}`);
     log(`🔐 Admin: admin@example.com / admin123`);
