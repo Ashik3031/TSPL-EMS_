@@ -66,7 +66,7 @@ export default function Leaderboard() {
       <TopStats topStats={topStats} />
 
      {/* Team Cards Grid */}
-      <div className=" px-2 sm:px-4 py-3 lg:py-6">
+      <div className=" px-2 sm:px-4 py-3 lg:py-1">
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 lg:gap-6">
             {[...Array(3)].map((_, i) => (

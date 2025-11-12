@@ -17,7 +17,14 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-10">
           <div className="flex items-center space-x-1.5">
             <div className="flex-shrink-0">
-              <h1 className="text-sm sm:text-base font-bold text-primary">Sales Leaderboard</h1>
+
+               <Link href="/" aria-label="Home">
+      <img
+        src="https://res.cloudinary.com/dxq0nrirt/image/upload/v1762951340/Telestation_fin_drzbil.png"                // or "/logo.png"
+        alt="Sales Leaderboard"
+        className="h-7 sm:h-8 md:h-9 w-auto"
+      />
+    </Link>
             </div>
             <div className="hidden md:block">
               <div className="flex space-x-0.5">

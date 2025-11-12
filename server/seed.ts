@@ -27,32 +27,32 @@ export async function seedData() {
   });
 
   const tl1 = await storage.createUser({
-    name: 'John Smith',
-    email: process.env.TL1_EMAIL || 'tl1@example.com',
+    name: 'Fuhad Zenin',
+    email: process.env.TL1_EMAIL || 'tl1@tele.com',
     passwordHash: tl1PasswordHash,
     role: 'tl',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
+    avatarUrl: 'https://res.cloudinary.com/dxq0nrirt/image/upload/v1762951340/WhatsApp_Image_2025-11-12_at_16.41.26_ec2fe733_exsk0a.jpg'
   });
 
   const tl2 = await storage.createUser({
-    name: 'Maria Garcia',
+    name: 'Anandhan ',
     email: process.env.TL2_EMAIL || 'tl2@example.com',
     passwordHash: tl2PasswordHash,
     role: 'tl',
-    avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=64&h=64&fit=crop&crop=face'
+    avatarUrl: 'https://res.cloudinary.com/dxq0nrirt/image/upload/…tsApp_Image_2025-10-04_at_6.03.24_PM_1_equwbv.jpg'
   });
 
   const tl3 = await storage.createUser({
-    name: 'Maria Garcia',
+    name: 'Vimal',
     email: process.env.TL3_EMAIL || 'tl2@example.com',
     passwordHash: tl3PasswordHash,
     role: 'tl',
-    avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=64&h=64&fit=crop&crop=face'
+    avatarUrl: 'https://res.cloudinary.com/dxq0nrirt/image/upload/v1762951340/WhatsApp_Image_2025-11-12_at_16.41.26_23b04ae8_exzmfa.jpg'
   });
 
   // Teams
   const teamAlpha = await storage.createTeam({
-    name: 'Team Alpha',
+    name: 'FNE',
     tlId: tl1.id,
     agents: [],
     avgActivation: 0,
@@ -62,7 +62,7 @@ export async function seedData() {
   });
 
   const teamBravo = await storage.createTeam({
-    name: 'Team Bravo',
+    name: 'Charlie',
     tlId: tl2.id,
     agents: [],
     avgActivation: 0,
@@ -72,7 +72,7 @@ export async function seedData() {
   });
 
   const teamfne = await storage.createTeam({
-    name: 'Team fne',
+    name: 'Digtel',
     tlId: tl3.id,
     agents: [],
     avgActivation: 0,

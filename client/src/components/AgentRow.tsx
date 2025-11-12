@@ -35,17 +35,36 @@ export default function AgentRow({ agent }: AgentRowProps) {
           data-testid={`agent-photo-${agent.id}`}
         />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-foreground text-xs lg:text-base truncate" data-testid={`agent-name-${agent.id}`}>
+          <p className="font-bold text-foreground text-xs lg:text-lg truncate uppercase" data-testid={`agent-name-${agent.id}`}>
             {agent.name}
           </p>
-          <div className="flex items-center space-x-2 lg:space-x-4 text-[10px] lg:text-sm text-muted-foreground">
-            <span data-testid={`agent-activations-${agent.id}`}>
-              {agent.activations} activations
-            </span>
-            <span data-testid={`agent-submissions-${agent.id}`}>
-              {agent.submissions} submissions
-            </span>
-          </div>
+         <div className="flex items-baseline gap-3 lg:gap-4">
+  {/* Activations */}
+  <span
+    data-testid={`agent-activations-${agent.id}`}
+    className="text-xl lg:text-xl font-extrabold leading-none"
+  >
+    {agent.activations}
+  </span>
+  <span className="text-black font-normal text-sm lg:text-base leading-none">
+    activation{agent.activations === 1 ? '' : 's'}
+  </span>
+
+  {/* Spacer between the two metrics */}
+  <span className="mx-2 lg:mx-3 opacity-30">•</span>
+
+  {/* Submissions */}
+  <span
+    data-testid={`agent-submissions-${agent.id}`}
+    className="text-xl lg:text-xl font-extrabold leading-none"
+  >
+    {agent.submissions}
+  </span>
+  <span className="text-black font-normal text-sm lg:text-base leading-none">
+    submission{agent.submissions === 1 ? '' : 's'}
+  </span>
+</div>
+
         </div>
       </div>
       <div className="text-right flex-shrink-0">

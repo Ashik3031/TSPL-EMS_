@@ -32,34 +32,34 @@ export default function TeamCard({ team, rank }: TeamCardProps) {
     <div className="bg-card rounded-lg shadow-lg border border-border overflow-hidden">
      {/* Team Header */}
 {/* Team Header (square TL photo, header height auto) */}
-<div className={`p-1.5 lg:p-6 ${isTopTeam ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-  {/* Left = fixed square image, Right = 2 rows */}
-  <div className="grid grid-cols-[auto,1fr] items-center gap-2 lg:gap-6">
-    {/* LEFT: fixed square TL photo */}
-    <div className="flex items-center">
+<div className={`px-2 py-1 ${isTopTeam ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+  {/* ultra-compact grid, no extra height */}
+  <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+    {/* LEFT: fixed-height image (square), tight border */}
+    <div className="flex">
       <img
         src={team.tlPhotoUrl}
         alt={`${team.tlName} photo`}
-        className={`w-24 h-24 lg:w-32 lg:h-32 object-cover rounded-xl border-2 lg:border-4 ${
+        className={`h-16 w-16 md:h-32 md:w-32 object-cover rounded-2xl border ${
           isTopTeam ? 'border-white/20' : 'border-gray-300'
         }`}
         data-testid={`team-leader-photo-${team.id}`}
       />
     </div>
 
-    {/* RIGHT: name/TL + avg (top), stats (bottom) */}
-    <div className="grid grid-rows-[auto,auto] gap-2 lg:gap-4">
-      {/* Top row */}
-      <div className="grid grid-cols-2 gap-2">
+    {/* RIGHT: two tight rows */}
+    <div className="grid grid-rows-[auto,auto] gap-1">
+      {/* Top row: name + avg (tight line-height) */}
+      <div className="grid grid-cols-2 gap-2 items-center min-w-0 px-10">
         <div className="min-w-0">
-          <div className="flex items-center gap-1">
-            {rank === 1 && <Award className="w-3 h-3 lg:w-5 lg:h-5 text-yellow-300 flex-shrink-0" />}
-            <h3 className="text-[10px] lg:text-xl font-bold truncate" data-testid={`team-name-${team.id}`}>
+          <div className="flex items-center gap-1 leading-none">
+            {rank === 1 && <Award className="w-5 h-5 text-yellow-300 flex-shrink-0" />}
+            <h3 className="text-xs md:text-xl font-bold truncate leading-none" data-testid={`team-name-${team.id}`}>
               {team.name}
             </h3>
           </div>
           <p
-            className={`text-[8px] lg:text-base truncate ${
+            className={`text-[10px] md:text-base truncate leading-tight ${
               isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'
             }`}
             data-testid={`team-leader-name-${team.id}`}
@@ -68,35 +68,35 @@ export default function TeamCard({ team, rank }: TeamCardProps) {
           </p>
         </div>
 
-        <div className="text-right">
-          <div className="text-sm lg:text-3xl font-bold" data-testid={`team-avg-activation-${team.id}`}>
+        <div className="text-right leading-none">
+          <div className="text-sm md:text-xl font-bold" data-testid={`team-avg-activation-${team.id}`}>
             {team.avgActivation}%
           </div>
-          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[7px] lg:text-sm`}>
+          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[10px]`}>
             Avg Act
           </div>
         </div>
       </div>
 
-      {/* Bottom row: stats (unchanged) */}
+      {/* Bottom row: stats (tiny, no heavy padding) */}
       <div
-        className={`grid grid-cols-2 gap-4 pt-1.5 lg:pt-4 border-t ${
-          isTopTeam ? 'border-primary-foreground/20' : 'border-secondary-foreground/20'
+        className={`grid grid-cols-2 gap-2 pt-2 border-t ${
+          isTopTeam ? 'border-primary-foreground/15' : 'border-secondary-foreground/15'
         }`}
       >
-        <div className="text-center">
-          <div className="text-xs lg:text-2xl font-bold" data-testid={`team-total-activations-${team.id}`}>
+        <div className="text-center leading-none">
+          <div className="text-xl font-extrabold" data-testid={`team-total-activations-${team.id}`}>
             {team.totalActivations}
           </div>
-          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[7px] lg:text-xs uppercase`}>
+          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[10px] uppercase`}>
             Activations
           </div>
         </div>
-        <div className="text-center">
-          <div className="text-xs lg:text-2xl font-bold" data-testid={`team-total-submissions-${team.id}`}>
+        <div className="text-center leading-none">
+          <div className="text-xl font-extrabold" data-testid={`team-total-submissions-${team.id}`}>
             {team.totalSubmissions}
           </div>
-          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[7px] lg:text-xs uppercase`}>
+          <div className={`${isTopTeam ? 'text-primary-foreground/80' : 'text-secondary-foreground/80'} text-[10px] uppercase`}>
             Submissions
           </div>
         </div>
@@ -104,6 +104,7 @@ export default function TeamCard({ team, rank }: TeamCardProps) {
     </div>
   </div>
 </div>
+
 
 
 
