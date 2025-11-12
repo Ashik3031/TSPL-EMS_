@@ -22,7 +22,7 @@ interface Agent {
   activationTarget: number;
   activations: number;
   submissions: number;
-  points: number;
+  // points: number;
 }
 
 const createAgentSchema = z.object({
@@ -137,14 +137,14 @@ export default function TLDashboard() {
 
   const [isUpdating, setIsUpdating] = useState(false);
 
-const handleIncrement = async (agentId: string, field: 'submissions' | 'activations' | 'points', delta: number) => {
+const handleIncrement = async (agentId: string, field: 'submissions' | 'activations'  , delta: number) => {
   if (isUpdating) return;
   setIsUpdating(true);
 
-  sendWithAuth({
-    type: 'tl:updateCounters',
-    data: { agentId, delta: { [field]: delta } }
-  });
+  // sendWithAuth({
+  //   type: 'tl:updateCounters',
+  //   data: { agentId, delta: { [field]: delta } }
+  // });
 
   await updateMutation.mutateAsync({ agentId, delta: { [field]: delta } });
 
@@ -434,9 +434,9 @@ const handleIncrement = async (agentId: string, field: 'submissions' | 'activati
                     <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Activations
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {/* <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Points
-                    </th>
+                    </th> */}
                     <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Rate
                     </th>
@@ -517,7 +517,7 @@ const handleIncrement = async (agentId: string, field: 'submissions' | 'activati
                           </Button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {/* <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center space-x-2">
                           <Button
                             size="sm"
@@ -543,7 +543,7 @@ const handleIncrement = async (agentId: string, field: 'submissions' | 'activati
                             <Plus className="w-3 h-3" />
                           </Button>
                         </div>
-                      </td>
+                      </td> */}
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center">
                           <span className="text-lg font-bold text-green-600" data-testid={`agent-activation-percent-${agent.id}`}>

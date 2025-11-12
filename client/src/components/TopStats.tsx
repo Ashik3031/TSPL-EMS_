@@ -21,7 +21,7 @@ export default function TopStats({ topStats }: TopStatsProps) {
   if (!topStats) {
     return (
       <div className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-muted rounded-lg p-4 animate-pulse">
@@ -36,7 +36,7 @@ export default function TopStats({ topStats }: TopStatsProps) {
 
   return (
     <div className="bg-card border-b border-border">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 lg:py-6">
+      <div className=" px-2 sm:px-4 lg:px-8 py-2 lg:py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2 lg:gap-6">
           {/* Top Agent of the Month */}
           <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-1.5 lg:p-4">

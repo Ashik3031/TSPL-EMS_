@@ -435,7 +435,7 @@ export default function CelebrationPopup({
 
         {/* Celebration Card - Appears after countdown */}
         {showCard && (
-          <div className="relative w-full max-w-2xl mx-auto px-4">
+          <div className="relative w-full max-w-5xl mx-auto px-4 min-h-[620px]">
             {/* Continuous Glitters - Keep popping throughout */}
             {continuousGlitters.map((glitter) => {
               const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#A78BFA', '#F59E0B', '#F472B6', '#10B981', '#FBBF24', '#EC4899'];
@@ -585,7 +585,7 @@ export default function CelebrationPopup({
 
             {/* Main Card */}
             <div className="card-enter">
-              <div className="relative bg-gradient-to-br from-white via-amber-50/50 to-white backdrop-blur-xl rounded-3xl shadow-2xl p-8 md:p-12 text-center overflow-hidden">
+<div className="relative bg-gradient-to-br from-white via-amber-50/50 to-white backdrop-blur-xl rounded-[2rem] shadow-2xl p-10 md:p-14 overflow-hidden min-h-[620px] flex items-center">
                 {/* Shimmer effect */}
                 <div className="absolute inset-0 shimmer pointer-events-none" />
                 
@@ -594,72 +594,78 @@ export default function CelebrationPopup({
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-orange-400/20 to-transparent rounded-tl-full" />
 
                 {/* Content */}
-                <div className="relative z-10">
-                  {/* Badge */}
-                  <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 text-black text-sm font-bold mb-8 shadow-lg">
-                    <span className="text-lg">🏆</span>
-                    <span>{Math.max(1, data.newActivationCount)} Activation{data.newActivationCount > 1 ? 's' : ''}</span>
-                    <span className="text-lg">🏆</span>
-                  </div>
+     
+{/* Content — photo LEFT (full size rectangle), text RIGHT */}
+<div className="relative z-10">
+  <div className="grid grid-cols-1 md:grid-cols-[48%,1fr] items-stretch gap-10 md:gap-14 min-h-[680px]">
+    {/* LEFT: Full-size rectangular image */}
+    <div className="md:self-stretch">
+      <div className="relative h-full w-full overflow-hidden rounded-2xl shadow-2xl">
+        {/* soft glow */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 blur-2xl" />
+        <img
+          src={data.photoUrl}
+          alt={agentDisplay}
+          className="h-full w-full object-cover object-center"
+          data-testid="celebration-agent-photo"
+        />
+        {/* sparkle badge (keep if you like) */}
+        <div className="absolute bottom-4 right-4 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl p-3 md:p-4 shadow-xl">
+          <Sparkles className="w-7 h-7 md:w-9 md:h-9 text-white" />
+        </div>
+      </div>
+    </div>
 
-                  {/* Agent Photo - Larger with animation */}
-                  <div className="flex justify-center mb-8 float-animation">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full blur-xl opacity-60 animate-pulse" />
-                      <img
-                        src={data.photoUrl}
-                        alt={agentDisplay}
-                        className="relative w-48 h-48 md:w-56 md:h-56 object-cover object-top rounded-full ring-8 ring-yellow-400 shadow-2xl"
-                        data-testid="celebration-agent-photo"
-                      />
-                      <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full p-3 shadow-xl">
-                        <Sparkles className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                  </div>
+    {/* RIGHT: text (left-aligned) */}
+    <div className="flex items-center">
+      <div className="w-full text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 text-black text-sm font-bold mb-6 shadow-lg">
+          <span className="text-lg">🏆</span>
+          <span>{Math.max(1, data.newActivationCount)} Activation{data.newActivationCount > 1 ? 's' : ''}</span>
+          <span className="text-lg">🏆</span>
+        </div>
 
-                  {/* Agent Name */}
-                  <h3 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 mb-3" 
-                      data-testid="celebration-agent-name">
-                    {agentDisplay}
-                  </h3>
+        {/* Agent Name */}
+        <h3 className="text-4xl md:text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 mb-2">
+          {agentDisplay}
+        </h3>
 
-                  {/* Team Name */}
-                  {data.teamName && (
-                    <p className="text-lg text-gray-600 font-semibold mb-8">
-                      Team {data.teamName}
-                    </p>
-                  )}
+        {/* Team Name */}
+        {data.teamName && (
+          <p className="text-lg md:text-xl text-gray-600 font-semibold mb-6">
+            Team {data.teamName}
+          </p>
+        )}
 
-                  {/* Congratulations Message */}
-                  <div className="bg-gradient-to-r from-purple-50 via-pink-50 to-purple-50 rounded-2xl p-6 mb-8 shadow-inner">
-                    <p className="text-3xl font-black mb-3">
-                      <span className="inline-block animate-bounce">🎊</span>
-                      {' '}Congratulations!{' '}
-                      <span className="inline-block animate-bounce" style={{ animationDelay: '0.1s' }}>🎊</span>
-                    </p>
-                    <p className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600">
-                      Outstanding Achievement!
-                    </p>
-                    <p className="text-sm text-gray-500 mt-3 font-medium">
-                      {new Date(data.timestamp).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                      })}
-                    </p>
-                  </div>
+        {/* Message + Timestamp */}
+        <div className="bg-gradient-to-r from-purple-50 via-pink-50 to-purple-50 rounded-2xl p-5 md:p-6 mb-6 shadow-inner inline-block">
+          <p className="text-2xl md:text-3xl font-black mb-2">🎊 Congratulations! 🎊</p>
+          <p className="text-sm md:text-base font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600">
+            Outstanding Achievement!
+          </p>
+          <p className="text-xs md:text-sm text-gray-500 mt-2 font-medium">
+            {new Date(data.timestamp).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}
+          </p>
+        </div>
 
-                  {/* Close Button */}
-                  <Button
-                    onClick={onClose}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-500 text-black font-bold text-lg py-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                    data-testid="celebration-close"
-                  >
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Awesome! Keep It Up!
-                    <Sparkles className="w-5 h-5 ml-2" />
-                  </Button>
-                </div>
+        {/* Close button */}
+        <Button
+          onClick={onClose}
+          className="bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-500 text-black font-bold text-lg px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+          data-testid="celebration-close"
+        >
+          <Sparkles className="w-5 h-5 mr-2" />
+          Awesome! Keep It Up!
+          <Sparkles className="w-5 h-5 ml-2" />
+        </Button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
               </div>
             </div>
           </div>
