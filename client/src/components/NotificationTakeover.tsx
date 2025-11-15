@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNotificationStore } from "@/store/notificationStore";
@@ -15,6 +15,19 @@ export default function NotificationTakeover() {
   const [muted, setMuted] = useState(true);
   const [autoplayAllowed, setAutoplayAllowed] = useState(false);
 
+  // 🔔 Notification sound (for text notifications only)
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Preload notification sound once
+  useEffect(() => {
+    if (!notificationSoundRef.current) {
+      // Make sure this file exists: /public/sounds/notification.mp3
+      notificationSoundRef.current = new Audio("https://res.cloudinary.com/dugtxybef/video/upload/v1763200414/Akashakottayile_Sulthan_Mamukkoya_Comedy...-_AudioTrimmer.com_jlcgba.mp3");
+      notificationSoundRef.current.preload = "auto";
+    }
+  }, []);
+
+  // Timer for remaining time
   useEffect(() => {
     if (isVisible && remainingTime > 0) {
       const timer = setInterval(() => decrementTime(), 1000);
@@ -22,11 +35,27 @@ export default function NotificationTakeover() {
     }
   }, [isVisible, remainingTime, decrementTime]);
 
+  // Check autoplay permission for video
   useEffect(() => {
     const allowed = localStorage.getItem("autoplayAllowed") === "true";
     setAutoplayAllowed(allowed);
     if (allowed) setMuted(false);
   }, []);
+
+  // 🔔 Play sound ONLY when a text notification becomes visible
+  useEffect(() => {
+    if (
+      isVisible &&
+      activeNotification &&
+      activeNotification.type === "text" &&
+      notificationSoundRef.current
+    ) {
+      notificationSoundRef.current.currentTime = 0;
+      notificationSoundRef.current.play().catch(() => {
+        // Ignore autoplay errors (browser blocks, etc.)
+      });
+    }
+  }, [isVisible, activeNotification]);
 
   if (!isVisible || !activeNotification) return null;
 
@@ -47,7 +76,10 @@ export default function NotificationTakeover() {
         return (
           <div className="space-y-6">
             <div className="text-6xl mb-8">📢</div>
-            <p className="text-2xl text-foreground leading-relaxed" data-testid="notification-message">
+            <p
+              className="text-2xl text-foreground leading-relaxed"
+              data-testid="notification-message"
+            >
               {activeNotification.message}
             </p>
           </div>
@@ -66,21 +98,19 @@ export default function NotificationTakeover() {
       case "video":
         return (
           <div className="space-y-4">
-          <video
-  id="notification-video"
-  autoPlay
-  playsInline
-  muted={muted}
-  controls
-  className="max-w-full max-h-[80vh] w-auto h-auto rounded-lg shadow-lg mx-auto object-contain"
-  data-testid="notification-video"
->
-  <source src={activeNotification.mediaUrl} type="video/mp4" />
-  Your browser does not support the video tag.
-</video>
+            <video
+              id="notification-video"
+              autoPlay
+              playsInline
+              muted={muted}
+              controls
+              className="max-w-full max-h-[80vh] w-auto h-auto rounded-lg shadow-lg mx-auto object-contain"
+              data-testid="notification-video"
+            >
+              <source src={activeNotification.mediaUrl} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
 
-
-            {/* Show enable button if muted */}
             {muted && !autoplayAllowed && (
               <Button
                 onClick={handleEnableSound}
@@ -101,11 +131,13 @@ export default function NotificationTakeover() {
               autoPlay
               className="w-full max-w-md mx-auto"
               data-testid="notification-audio"
+              src={activeNotification.mediaUrl} // supports URL or data: URL
             >
-              <source src={activeNotification.mediaUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
-            <p className="text-lg text-muted-foreground">Audio message from Administration</p>
+            <p className="text-lg text-muted-foreground">
+              Audio message from Administration
+            </p>
           </div>
         );
 
@@ -115,15 +147,23 @@ export default function NotificationTakeover() {
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-50 notification-enter" data-testid="notification-takeover">
+    <div
+      className="fixed inset-0 bg-background z-50 notification-enter"
+      data-testid="notification-takeover"
+    >
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="bg-card border-b border-border px-6 py-4 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-foreground" data-testid="notification-title">
+            <h2
+              className="text-2xl font-bold text-foreground"
+              data-testid="notification-title"
+            >
               {activeNotification.title || "Important Announcement"}
             </h2>
-            <p className="text-sm text-muted-foreground">Notification from Administration</p>
+            <p className="text-sm text-muted-foreground">
+              Notification from Administration
+            </p>
           </div>
           <Button
             variant="ghost"
@@ -146,7 +186,10 @@ export default function NotificationTakeover() {
           <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
             <span>
               This notification will auto-close in{" "}
-              <span className="font-bold" data-testid="notification-remaining-time">
+              <span
+                className="font-bold"
+                data-testid="notification-remaining-time"
+              >
                 {remainingTime}
               </span>{" "}
               seconds
