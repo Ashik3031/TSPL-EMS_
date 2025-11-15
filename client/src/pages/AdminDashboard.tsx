@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Radio, XCircle, Save } from 'lucide-react';
+import { Radio, XCircle, Save, Mic, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +25,90 @@ export default function AdminDashboard() {
   const [defaultNotificationDuration, setDefaultNotificationDuration] = useState(15000);
   const [globalSoundEnabled, setGlobalSoundEnabled] = useState(true);
 
+  // 🔴 Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+
+  const blobToDataUrl = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({
+          title: 'Recording not supported',
+          description: 'Your browser does not support audio recording.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const dataUrl = await blobToDataUrl(audioBlob);
+
+        // 🟢 Use data URL as mediaUrl so backend stays unchanged
+        setRecordedAudioUrl(dataUrl);
+        setMediaUrl(dataUrl);
+        setNotificationType('audio');
+
+        // Stop all tracks (mic)
+        stream.getTracks().forEach((t) => t.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast({
+        title: 'Recording started',
+        description: 'Speak now. Click stop when you are done.',
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: 'Failed to start recording',
+        description: error?.message || 'Microphone access was denied.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      toast({
+        title: 'Recording stopped',
+        description: 'You can preview the audio before sending.',
+      });
+    }
+  };
+
+  const handleClearRecording = () => {
+    setRecordedAudioUrl(null);
+    setMediaUrl('');
+    // Optional: reset type back to text
+    // setNotificationType('text');
+  };
+
   const pushNotificationMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest('POST', '/api/admin/notifications', data);
@@ -39,6 +123,7 @@ export default function AdminDashboard() {
       setTitle('');
       setMessage('');
       setMediaUrl('');
+      setRecordedAudioUrl(null);
     },
     onError: (error: Error) => {
       toast({
@@ -73,7 +158,7 @@ export default function AdminDashboard() {
     if (!message && !mediaUrl) {
       toast({
         title: 'Invalid Input',
-        description: 'Please provide either a message or media URL',
+        description: 'Please provide either a message or media (recorded or URL)',
         variant: 'destructive',
       });
       return;
@@ -115,7 +200,10 @@ export default function AdminDashboard() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="notification-type">Notification Type</Label>
-              <Select value={notificationType} onValueChange={(value: any) => setNotificationType(value)}>
+              <Select
+                value={notificationType}
+                onValueChange={(value: any) => setNotificationType(value)}
+              >
                 <SelectTrigger data-testid="notification-type-select">
                   <SelectValue placeholder="Select notification type" />
                 </SelectTrigger>
@@ -165,16 +253,71 @@ export default function AdminDashboard() {
               />
             </div>
 
+            {/* Manual media URL (still supported) */}
             <div>
               <Label htmlFor="media-url">Media URL (for image/video/audio)</Label>
               <Input
                 id="media-url"
                 type="url"
                 placeholder="https://example.com/media.jpg"
-                value={mediaUrl}
+                value={mediaUrl.startsWith('data:') ? '' : mediaUrl}
                 onChange={(e) => setMediaUrl(e.target.value)}
                 data-testid="notification-media-url-input"
               />
+              {mediaUrl.startsWith('data:') && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Using recorded audio as media source.
+                </p>
+              )}
+            </div>
+
+            {/* 🎙 Recording controls */}
+            <div className="space-y-2">
+              <Label>Record Voice Message (optional)</Label>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={handleStartRecording}
+                  disabled={isRecording}
+                  variant={isRecording ? 'outline' : 'default'}
+                  className="flex items-center gap-2"
+                >
+                  <Mic className="w-4 h-4" />
+                  {isRecording ? 'Recording...' : 'Start Recording'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleStopRecording}
+                  disabled={!isRecording}
+                  variant="destructive"
+                  className="flex items-center gap-2"
+                >
+                  <Square className="w-4 h-4" />
+                  Stop
+                </Button>
+
+                {recordedAudioUrl && (
+                  <>
+                    <audio
+                      controls
+                      src={recordedAudioUrl}
+                      className="h-10"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleClearRecording}
+                    >
+                      Clear Recording
+                    </Button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                After you stop recording, the audio will be attached to this notification as an
+                audio message.
+              </p>
             </div>
 
             <div className="flex space-x-3">
@@ -215,13 +358,19 @@ export default function AdminDashboard() {
                   max="30000"
                   step="1000"
                   value={defaultPopupDuration}
-                  onChange={(e) => setDefaultPopupDuration(parseInt(e.target.value) || 5000)}
+                  onChange={(e) =>
+                    setDefaultPopupDuration(parseInt(e.target.value) || 5000)
+                  }
                   data-testid="popup-duration-input"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Duration for celebration popups</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Duration for celebration popups
+                </p>
               </div>
               <div>
-                <Label htmlFor="notification-duration">Default Notification Duration (ms)</Label>
+                <Label htmlFor="notification-duration">
+                  Default Notification Duration (ms)
+                </Label>
                 <Input
                   id="notification-duration"
                   type="number"
@@ -229,17 +378,25 @@ export default function AdminDashboard() {
                   max="300000"
                   step="1000"
                   value={defaultNotificationDuration}
-                  onChange={(e) => setDefaultNotificationDuration(parseInt(e.target.value) || 15000)}
+                  onChange={(e) =>
+                    setDefaultNotificationDuration(
+                      parseInt(e.target.value) || 15000
+                    )
+                  }
                   data-testid="notification-duration-setting-input"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Duration for takeover notifications</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Duration for takeover notifications
+                </p>
               </div>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div>
                 <Label htmlFor="global-sound">Global Sound</Label>
-                <p className="text-xs text-muted-foreground">Enable/disable sound for all celebration popups</p>
+                <p className="text-xs text-muted-foreground">
+                  Enable/disable sound for all celebration popups
+                </p>
               </div>
               <Switch
                 id="global-sound"
