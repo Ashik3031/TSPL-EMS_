@@ -134,7 +134,7 @@ export class MongoStorage implements IStorage {
     };
   }
 
-  async getAgent(id: string): Promise<Agent | undefined> {
+   async getAgent(id: string): Promise<Agent | undefined> {
     const agent = await AgentModel.findById(id).lean();
     if (!agent) return undefined;
     return {
@@ -146,13 +146,16 @@ export class MongoStorage implements IStorage {
       activations: agent.activations,
       submissions: agent.submissions,
       points: agent.points,
-      lastSubmissionReset: agent.lastSubmissionReset
+      todaySubmissions: agent.todaySubmissions ?? 0,  // 👈 NEW
+      lastSubmissionReset: agent.lastSubmissionReset,
     };
   }
+async getAgentsByTeamId(teamId: string): Promise<Agent[]> {
+  const agents = await AgentModel.find({ teamId }).lean();
+  return agents.map(agent => {
+    const todaySubmissions = (agent as any).todaySubmissions ?? 0;
 
-  async getAgentsByTeamId(teamId: string): Promise<Agent[]> {
-    const agents = await AgentModel.find({ teamId }).lean();
-    return agents.map(agent => ({
+    return {
       id: agent._id.toString(),
       name: agent.name,
       photoUrl: agent.photoUrl,
@@ -161,27 +164,18 @@ export class MongoStorage implements IStorage {
       activations: agent.activations,
       submissions: agent.submissions,
       points: agent.points,
-      lastSubmissionReset: agent.lastSubmissionReset
-    }));
-  }
+      todaySubmissions,
+      lastSubmissionReset: agent.lastSubmissionReset,
+    };
+  });
+}
+
 
   async getAllAgents(): Promise<Agent[]> {
-    const agents = await AgentModel.find().lean();
-    return agents.map(agent => ({
-      id: agent._id.toString(),
-      name: agent.name,
-      photoUrl: agent.photoUrl,
-      teamId: agent.teamId,
-      activationTarget: agent.activationTarget,
-      activations: agent.activations,
-      submissions: agent.submissions,
-      points: agent.points,
-      lastSubmissionReset: agent.lastSubmissionReset
-    }));
-  }
+  const agents = await AgentModel.find().lean();
+  return agents.map(agent => {
+    const todaySubmissions = (agent as any).todaySubmissions ?? 0;
 
-  async createAgent(insertAgent: InsertAgent): Promise<Agent> {
-    const agent = await AgentModel.create(insertAgent);
     return {
       id: agent._id.toString(),
       name: agent.name,
@@ -191,49 +185,102 @@ export class MongoStorage implements IStorage {
       activations: agent.activations,
       submissions: agent.submissions,
       points: agent.points,
-      lastSubmissionReset: agent.lastSubmissionReset
+      todaySubmissions,
+      lastSubmissionReset: agent.lastSubmissionReset,
     };
-  }
+  });
+}
+
+
+ async createAgent(insertAgent: InsertAgent): Promise<Agent> {
+  const agent = await AgentModel.create({
+    ...insertAgent,
+    todaySubmissions: insertAgent.todaySubmissions ?? 0,
+    lastSubmissionReset: insertAgent.lastSubmissionReset ?? new Date(),
+  });
+
+  const todaySubmissions = (agent as any).todaySubmissions ?? 0;
+
+  return {
+    id: agent._id.toString(),
+    name: agent.name,
+    photoUrl: agent.photoUrl,
+    teamId: agent.teamId,
+    activationTarget: agent.activationTarget,
+    activations: agent.activations,
+    submissions: agent.submissions,
+    points: agent.points,
+    todaySubmissions,
+    lastSubmissionReset: agent.lastSubmissionReset,
+  };
+}
+
 
   async updateAgent(id: string, updates: Partial<Agent>): Promise<Agent | undefined> {
-    const agent = await AgentModel.findByIdAndUpdate(id, updates, { new: true }).lean();
-    if (!agent) return undefined;
-    return {
-      id: agent._id.toString(),
-      name: agent.name,
-      photoUrl: agent.photoUrl,
-      teamId: agent.teamId,
-      activationTarget: agent.activationTarget,
-      activations: agent.activations,
-      submissions: agent.submissions,
-      points: agent.points,
-      lastSubmissionReset: agent.lastSubmissionReset
-    };
-  }
+  const agent = await AgentModel.findByIdAndUpdate(id, updates, { new: true }).lean();
+  if (!agent) return undefined;
+
+  const todaySubmissions = (agent as any).todaySubmissions ?? 0;
+
+  return {
+    id: agent._id.toString(),
+    name: agent.name,
+    photoUrl: agent.photoUrl,
+    teamId: agent.teamId,
+    activationTarget: agent.activationTarget,
+    activations: agent.activations,
+    submissions: agent.submissions,
+    points: agent.points,
+    todaySubmissions,
+    lastSubmissionReset: agent.lastSubmissionReset,
+  };
+}
 
   async deleteAgent(id: string): Promise<boolean> {
     const result = await AgentModel.findByIdAndDelete(id);
     return !!result;
   }
 
-  async resetDailySubmissions(): Promise<void> {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const agents = await AgentModel.find().lean();
-    
-    for (const agent of agents) {
-      const lastReset = new Date(agent.lastSubmissionReset);
-      const lastResetDay = new Date(lastReset.getFullYear(), lastReset.getMonth(), lastReset.getDate());
-      
-      if (lastResetDay < today) {
-        await AgentModel.findByIdAndUpdate(agent._id, {
-          submissions: 0,
-          lastSubmissionReset: now
-        });
-      }
+ async resetDailySubmissions(): Promise<void> {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const agents = await AgentModel.find().lean();
+
+  for (const agent of agents) {
+    const lastResetRaw = agent.lastSubmissionReset
+      ? new Date(agent.lastSubmissionReset)
+      : new Date(0);
+
+    const lastResetDay = new Date(
+      lastResetRaw.getFullYear(),
+      lastResetRaw.getMonth(),
+      lastResetRaw.getDate()
+    );
+
+    // Only do something if we've moved to a new day
+    if (lastResetDay >= today) continue;
+
+    // New month?
+    const isNewMonth =
+      lastResetRaw.getFullYear() !== now.getFullYear() ||
+      lastResetRaw.getMonth() !== now.getMonth();
+
+    const update: any = {
+      todaySubmissions: 0,     // reset daily counter every new day
+      lastSubmissionReset: now,
+    };
+
+    if (isNewMonth) {
+      // also reset monthly totals when month changed
+      update.submissions = 0;
+      update.activations = 0;
     }
+
+    await AgentModel.findByIdAndUpdate(agent._id, update);
   }
+}
+
 
   async getActiveNotification(): Promise<Notification | undefined> {
     const notification = await NotificationModel.findOne({ isActive: true }).lean();

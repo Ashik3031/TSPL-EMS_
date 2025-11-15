@@ -48,7 +48,9 @@ export const insertTeamSchema = z.object({
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type Team = InsertTeam & { id: string };
 
-// Agent schema
+//
+// 🔽🔽🔽 AGENT SCHEMA – UPDATED 🔽🔽🔽
+//
 export const agents = {
   id: z.string(),
   name: z.string(),
@@ -58,7 +60,8 @@ export const agents = {
   activations: z.number(),
   submissions: z.number(),
   points: z.number(),
-  lastSubmissionReset: z.date(),
+  todaySubmissions: z.number(),     // 👈 NEW: today-only submissions counter
+  lastSubmissionReset: z.date(),    // used for daily/monthly reset logic
 };
 
 export const insertAgentSchema = z.object({
@@ -66,16 +69,21 @@ export const insertAgentSchema = z.object({
   photoUrl: z.string().url(),
   teamId: z.string(),
   activationTarget: z.number().min(1),
-  activations: z.number().default(0),
-  submissions: z.number().default(0),
+  activations: z.number().default(0),       // monthly activations
+  submissions: z.number().default(0),       // monthly submissions
   points: z.number().default(0),
+  todaySubmissions: z.number().default(0),  // 👈 NEW: defaults to 0
+  // we’ll store when we last reset (day/month).
+  // I’ll keep it as "now" so the very first reset works correctly.
   lastSubmissionReset: z.date().default(() => new Date()),
 });
 
 export type InsertAgent = z.infer<typeof insertAgentSchema>;
 export type Agent = InsertAgent & { id: string };
 
-// Notification schema
+//
+// Notification & auth schemas (unchanged)
+//
 export const notifications = {
   id: z.string(),
   type: z.enum(['text', 'image', 'video', 'audio']),

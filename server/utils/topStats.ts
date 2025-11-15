@@ -1,5 +1,5 @@
-import { storage } from '../storage';
-import { Agent } from '@shared/schema';
+import { storage } from "../storage";
+import type { Agent } from "@shared/schema";
 
 export interface TopStats {
   topAgentMonth: {
@@ -10,43 +10,85 @@ export interface TopStats {
   topAgentToday: {
     name: string;
     photoUrl: string;
-    submissions: number;
+    todaySubmissions: number;
   };
   totalActivations: number;
   totalSubmissions: number;
+  totalTodaySubmissions: number; // 👈 NEW
 }
 
 export const computeTopStats = async (): Promise<TopStats> => {
   const allAgents = await storage.getAllAgents();
-  
-  // For demo purposes, we'll use simple logic
-  // In production, you'd track daily/monthly data separately
-  
-  // Top agent by total activations (representing monthly)
-  const topAgentMonth = allAgents.reduce((top, agent) => 
-    agent.activations > top.activations ? agent : top
-  , allAgents[0] || { name: 'No agents', photoUrl: '', activations: 0 });
 
-  // Top agent by submissions (representing today)
-  const topAgentToday = allAgents.reduce((top, agent) => 
-    agent.submissions > top.submissions ? agent : top
-  , allAgents[0] || { name: 'No agents', photoUrl: '', submissions: 0 });
+  console.log(
+    "DEBUG TopStats agents:",
+    allAgents.map(a => ({
+      name: a.name,
+      submissions: a.submissions,
+      todaySubmissions: (a as any).todaySubmissions,
+    }))
+  );
 
-  const totalActivations = allAgents.reduce((sum, agent) => sum + agent.activations, 0);
-  const totalSubmissions = allAgents.reduce((sum, agent) => sum + agent.submissions, 0);
+
+  if (!allAgents.length) {
+    return {
+      topAgentMonth: {
+        name: "No agents",
+        photoUrl: "",
+        activations: 0,
+      },
+      topAgentToday: {
+        name: "No agents",
+        photoUrl: "",
+        todaySubmissions: 0,
+      },
+      totalActivations: 0,
+      totalSubmissions: 0,
+      totalTodaySubmissions: 0,
+    };
+  }
+
+  // 🔹 Top agent by monthly activations
+  const topAgentMonth = allAgents.reduce<Agent>((top, agent) =>
+    (agent.activations ?? 0) > (top.activations ?? 0) ? agent : top
+  );
+
+  // 🔹 Top agent by TODAY submissions (todaySubmissions)
+  const topAgentToday = allAgents.reduce<Agent>((top, agent) => {
+    const topToday = (top as any).todaySubmissions ?? 0;
+    const currentToday = (agent as any).todaySubmissions ?? 0;
+    return currentToday > topToday ? agent : top;
+  });
+
+  // 🔹 Monthly totals
+  const totalActivations = allAgents.reduce(
+    (sum, agent) => sum + (agent.activations ?? 0),
+    0
+  );
+  const totalSubmissions = allAgents.reduce(
+    (sum, agent) => sum + (agent.submissions ?? 0),
+    0
+  );
+
+  // 🔹 Today's total submissions
+  const totalTodaySubmissions = allAgents.reduce(
+    (sum, agent) => sum + ((agent as any).todaySubmissions ?? 0),
+    0
+  );
 
   return {
     topAgentMonth: {
       name: topAgentMonth.name,
       photoUrl: topAgentMonth.photoUrl,
-      activations: topAgentMonth.activations
+      activations: topAgentMonth.activations ?? 0,
     },
     topAgentToday: {
       name: topAgentToday.name,
       photoUrl: topAgentToday.photoUrl,
-      submissions: topAgentToday.submissions
+      todaySubmissions: (topAgentToday as any).todaySubmissions ?? 0,
     },
     totalActivations,
-    totalSubmissions
+    totalSubmissions,
+    totalTodaySubmissions, // 👈 included in response
   };
 };

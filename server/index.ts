@@ -63,9 +63,9 @@ function scheduleDailyReset() {
   await connectToMongoDB();
   await seedData();
 
-  log("🔄 Checking for daily submission reset...");
+  log("🔄 Checking for montly submission reset...");
   await storage.resetDailySubmissions();
-  log("✅ Daily submission reset check completed");
+  log("✅ montly submission reset check completed");
 
   scheduleDailyReset();
 

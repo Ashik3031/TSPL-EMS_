@@ -27,6 +27,7 @@ const agentSchema = new mongoose.Schema({
   activations: { type: Number, default: 0 },
   submissions: { type: Number, default: 0 },
   points: { type: Number, default: 0 },
+    todaySubmissions: { type: Number, default: 0 }, 
   lastSubmissionReset: { type: Date, default: Date.now }
 });
 
