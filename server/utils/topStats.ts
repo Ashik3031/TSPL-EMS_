@@ -48,17 +48,22 @@ export const computeTopStats = async (): Promise<TopStats> => {
     };
   }
 
-  // 🔹 Top agent by monthly activations
-  const topAgentMonth = allAgents.reduce<Agent>((top, agent) =>
-    (agent.activations ?? 0) > (top.activations ?? 0) ? agent : top
-  );
+  const topAgentMonth =
+  allAgents.length > 0
+    ? allAgents.reduce((top, agent) =>
+        (agent.activations ?? 0) > (top.activations ?? 0) ? agent : top
+      )
+    : null;
 
-  // 🔹 Top agent by TODAY submissions (todaySubmissions)
-  const topAgentToday = allAgents.reduce<Agent>((top, agent) => {
-    const topToday = (top as any).todaySubmissions ?? 0;
-    const currentToday = (agent as any).todaySubmissions ?? 0;
-    return currentToday > topToday ? agent : top;
-  });
+// 🔹 Top agent by TODAY submissions (todaySubmissions)
+const topAgentToday =
+  allAgents.length > 0
+    ? allAgents.reduce((top, agent) => {
+        const topToday = (top as any).todaySubmissions ?? 0;
+        const currentToday = (agent as any).todaySubmissions ?? 0;
+        return currentToday > topToday ? agent : top;
+      })
+    : null;
 
   // 🔹 Monthly totals
   const totalActivations = allAgents.reduce(
