@@ -76,9 +76,7 @@ A production-ready MERN application with Socket.IO for real-time sales team perf
    - **Login Page**: http://localhost:5000/login
    - **Public TV**: http://localhost:5000?tv=true
 
-### Demo Credentials
-- **Admin**: admin@example.com / admin123
-- **Team Leader**: tl@example.com / tl123
+
 
 ## 📖 Usage Guide
 
