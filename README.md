@@ -78,27 +78,7 @@ A production-ready MERN application with Socket.IO for real-time sales team perf
 
 
 
-## 📖 Usage Guide
 
-### For Team Leaders
-1. Login with TL credentials
-2. Navigate to "TL Dashboard" 
-3. Use +/- buttons to update agent metrics
-4. Activation increments trigger celebration popups with sound
-5. Updates are instantly reflected across all clients
-
-### For Admins  
-1. Login with Admin credentials
-2. Access "Admin Dashboard"
-3. Push takeover notifications (text, image, video, audio)
-4. Configure default durations and sound settings
-5. Manage system-wide settings
-
-### For Public/TV Display
-1. Visit the homepage (no login required)
-2. Real-time updates show automatically
-3. Celebration popups appear on activations
-4. Admin notifications take over the full screen
 
 ## 🏗 Architecture
 
